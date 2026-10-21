@@ -1,4 +1,39 @@
 export const en = {
+	encryption: {
+		heading: 'End-to-end encryption',
+		description:
+			'Encrypt file contents and names before upload. The remote folder can be opened in Cryptomator with your vault password. Local Obsidian files remain readable.',
+		setup: 'Set up encryption',
+		create: 'Create new encrypted vault',
+		connect: 'Connect existing encrypted vault',
+		change: 'Change encrypted vault',
+		operation: 'Operation',
+		folder: 'Encrypted OneDrive folder',
+		password: 'Vault password',
+		confirmPassword: 'Confirm password',
+		remember: 'Remember on this device',
+		rememberDescription:
+			'Store the unlock key in Obsidian SecretStorage so sync can resume after restart.',
+		previousCopies:
+			'Existing plaintext copies in OneDrive will remain. Reconfigure every device to use this encrypted folder. Keep the password to recover the downloaded folder using Cryptomator.',
+		start: 'Start encrypted sync',
+		working: 'Preparing encrypted sync…',
+		passwordMismatch: 'Enter a password and make sure both entries match.',
+		failed: 'Encrypted sync setup failed.',
+		locked: 'Encrypted sync locked — unlock in settings',
+		enabled: 'Encrypted sync enabled',
+		lock: 'Lock',
+		unlock: 'Unlock',
+		forget: 'Forget saved key',
+		appFolder: 'OneDrive app folder',
+		connectFirst: 'Connect to OneDrive before setting up encrypted sync.',
+		connectionChanged: 'The OneDrive connection changed during setup. Connect again and retry.',
+		waitForSync: 'Wait for the current sync or initialization to finish, then try again.',
+		resolveConflicts: 'Resolve existing sync conflicts before changing encrypted storage.',
+		invalidFolder: 'Choose a valid, non-root OneDrive folder path.',
+		destinationFixed:
+			'This encrypted vault is bound to its selected destination and account. Unlock the original destination before changing storage.',
+	},
 	commands: {
 		syncNow: 'Sync now',
 		connect: 'Connect to OneDrive',
@@ -98,7 +133,8 @@ export const en = {
 				'OneDrive sync: {{syncedCount}} {{fileLabel}} synced, {{conflictCount}} {{conflictLabel}} need resolution',
 			completedWithDeferred:
 				'OneDrive sync: {{syncedCount}} {{fileLabel}} synced; {{retryCount}} {{retryLabel}} will retry automatically ({{lockedCount}} locked/deferred)',
-			folderChangesFailed: 'OneDrive sync: {{count}} folder change(s) couldn\'t be applied on OneDrive. Enable debug logging for details.',
+			folderChangesFailed:
+				"OneDrive sync: {{count}} folder change(s) couldn't be applied on OneDrive. Enable debug logging for details.",
 			engineFailed: 'OneDrive sync failed: {{message}}',
 		},
 		reconcile: {
@@ -214,7 +250,7 @@ export const en = {
 				workSchool: 'Work or school (any organization)',
 				tenant: 'Work or school (specific organization)',
 				tenantIdName: 'Tenant ID',
-				tenantIdDesc: "The Entra ID tenant (directory) ID to sign in against.",
+				tenantIdDesc: 'The Entra ID tenant (directory) ID to sign in against.',
 				tenantIdPlaceholder: 'e.g. 11111111-1111-1111-1111-111111111111',
 				appFolderUnavailable: 'App Folder mode is unavailable for work and school accounts.',
 				reconnectRequired: ' Changing this requires reconnecting.',
@@ -306,7 +342,7 @@ export const en = {
 			},
 			pluginData: {
 				name: 'Sync plugin data',
-				desc: 'Also sync each plugin\'s data.json settings file. OneDrive Sync\'s own data remains device-local. Warning: plugin data can be device-specific and may cause conflicts; enable only if you understand the plugin\'s sync behaviour.',
+				desc: "Also sync each plugin's data.json settings file. OneDrive Sync's own data remains device-local. Warning: plugin data can be device-specific and may cause conflicts; enable only if you understand the plugin's sync behaviour.",
 			},
 			cssSnippets: {
 				name: 'Sync CSS snippets',
@@ -381,25 +417,26 @@ export const en = {
 			},
 		},
 		experimental: {
-				heading: 'Experimental',
-				description: 'These settings may improve performance but are not fully tested. Use at your own risk.',
-				skipFolderChecks: {
-					name: 'Skip folder existence checks',
-					desc: 'Skip API calls to verify folders exist before uploading. OneDrive auto-creates parent folders, so this is usually safe and faster.',
-				},
-					maxConcurrentOperations: {
-						name: 'Max concurrent operations',
-						desc: 'Maximum number of parallel upload/download operations. Higher values may speed up large syncs but could hit rate limits.',
-						placeholder: '4',
-					},
-					useAtomicMoves: {
-						name: 'Use atomic moves',
-						desc: 'Use OneDrive\'s native move API for file renames/moves instead of delete + re-upload. More efficient and avoids duplicate files if sync state is lost.',
-					},
-					pullOnlyMode: {
-						name: 'Pull-only mode (read-only sync)',
-						desc: 'Only download remote changes from OneDrive. Local edits will not be uploaded. Useful for read-only vaults or backup recovery. When disabled, local changes will sync on the next cycle.',
-					},
+			heading: 'Experimental',
+			description:
+				'These settings may improve performance but are not fully tested. Use at your own risk.',
+			skipFolderChecks: {
+				name: 'Skip folder existence checks',
+				desc: 'Skip API calls to verify folders exist before uploading. OneDrive auto-creates parent folders, so this is usually safe and faster.',
+			},
+			maxConcurrentOperations: {
+				name: 'Max concurrent operations',
+				desc: 'Maximum number of parallel upload/download operations. Higher values may speed up large syncs but could hit rate limits.',
+				placeholder: '4',
+			},
+			useAtomicMoves: {
+				name: 'Use atomic moves',
+				desc: "Use OneDrive's native move API for file renames/moves instead of delete + re-upload. More efficient and avoids duplicate files if sync state is lost.",
+			},
+			pullOnlyMode: {
+				name: 'Pull-only mode (read-only sync)',
+				desc: 'Only download remote changes from OneDrive. Local edits will not be uploaded. Useful for read-only vaults or backup recovery. When disabled, local changes will sync on the next cycle.',
+			},
 		},
 	},
 } as const;

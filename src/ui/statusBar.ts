@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { logger } from '../utils/logger';
 
 export enum SyncStatus {
+	LOCKED = 'locked',
 	IDLE = 'idle',
 	SYNCING = 'syncing',
 	ERROR = 'error',
@@ -91,6 +92,11 @@ export class StatusBarManager {
 
 		// Set icon and text based on status
 		switch (this.currentStatus) {
+			case SyncStatus.LOCKED:
+				setIcon(iconEl, 'lock');
+				textEl.setText(t('encryption.locked'));
+				this.statusBarItem.removeClass('is-syncing', 'has-error');
+				break;
 			case SyncStatus.IDLE:
 				setIcon(iconEl, 'cloud');
 				if (this.conflictCount > 0) {
@@ -169,6 +175,8 @@ export class StatusBarManager {
 	 */
 	private getTooltip(): string {
 		switch (this.currentStatus) {
+			case SyncStatus.LOCKED:
+				return t('encryption.locked');
 			case SyncStatus.IDLE:
 				if (this.lastSyncTime) {
 					return t('statusBar.tooltipLastSynced', {

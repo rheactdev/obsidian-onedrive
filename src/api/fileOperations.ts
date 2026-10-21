@@ -59,6 +59,11 @@ export class FileOperations {
 		return this.client.downloadFile(itemId);
 	}
 
+	async uploadExclusive(path: string, content: ArrayBuffer): Promise<OneDriveItem> {
+		await this.ensureParentFolder(path);
+		return this.chunkUploader.uploadExclusive(path, content);
+	}
+
 	/**
 	 * Download file by path
 	 */

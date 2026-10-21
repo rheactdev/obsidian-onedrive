@@ -1,6 +1,39 @@
 import type { LocaleStrings } from './en';
 
 export const zhCn = {
+	encryption: {
+		heading: '端到端加密',
+		description:
+			'上传前加密文件内容和名称。下载整个远程文件夹后，可使用保险库密码在 Cryptomator 中打开。本地 Obsidian 文件仍可正常读取。',
+		setup: '设置加密',
+		create: '创建新的加密保险库',
+		connect: '连接现有加密保险库',
+		change: '更改加密保险库',
+		operation: '操作',
+		folder: '加密的 OneDrive 文件夹',
+		password: '保险库密码',
+		confirmPassword: '确认密码',
+		remember: '在此设备上记住',
+		rememberDescription: '将解锁密钥保存在 Obsidian SecretStorage 中，以便重启后自动同步。',
+		previousCopies:
+			'OneDrive 中现有的明文副本会保留。请将每台设备重新配置为使用此加密文件夹。请妥善保存密码，以便使用 Cryptomator 恢复下载的文件夹。',
+		start: '开始加密同步',
+		working: '正在准备加密同步…',
+		passwordMismatch: '请输入密码并确保两次输入一致。',
+		failed: '加密同步设置失败。',
+		locked: '加密同步已锁定，请在设置中解锁',
+		enabled: '加密同步已启用',
+		lock: '锁定',
+		unlock: '解锁',
+		forget: '忘记保存的密钥',
+		appFolder: 'OneDrive 应用文件夹',
+		connectFirst: '设置加密同步前请先连接 OneDrive。',
+		connectionChanged: '设置期间 OneDrive 连接发生变化。请重新连接后重试。',
+		waitForSync: '请等待当前同步或初始化完成后重试。',
+		resolveConflicts: '更改加密存储前请先解决现有同步冲突。',
+		invalidFolder: '请选择有效的 OneDrive 文件夹路径，不能使用根目录。',
+		destinationFixed: '此加密保险库已绑定到选定的目标位置和帐户。更改存储前请解锁原始目标位置。',
+	},
 	commands: {
 		syncNow: '立即同步',
 		connect: '连接 OneDrive',
@@ -59,10 +92,12 @@ export const zhCn = {
 			connectSuccess: '已连接到 OneDrive',
 			connectFailed: '连接 OneDrive 失败：{{message}}',
 			disconnectSuccess: '已断开 OneDrive 连接',
-			customClientIdRequired: '工作或学校账户需要自定义客户端 ID。请参阅设置文档以注册您自己的应用程序。',
+			customClientIdRequired:
+				'工作或学校账户需要自定义客户端 ID。请参阅设置文档以注册您自己的应用程序。',
 			tenantIdRequired: '租户账户类型需要租户 ID。',
 			reconnectRequiredIdentityChanged: '账户设置已更改，请重新连接 OneDrive。',
-			accessModeSwitchedToFullAccess: '工作或学校账户不支持应用文件夹模式，访问模式已切换为完全访问。',
+			accessModeSwitchedToFullAccess:
+				'工作或学校账户不支持应用文件夹模式，访问模式已切换为完全访问。',
 			entra: {
 				conditionalAccessBlocked: '您组织的策略阻止了此登录方式。请联系管理员，或尝试其他设备。',
 				appNotAuthorized: '该应用程序尚未在您的组织中获得批准。请让管理员批准该应用注册。',
@@ -94,7 +129,8 @@ export const zhCn = {
 				'OneDrive 同步：已同步 {{syncedCount}} {{fileLabel}}，{{conflictCount}} {{conflictLabel}}需要处理',
 			completedWithDeferred:
 				'OneDrive sync: {{syncedCount}} {{fileLabel}} synced; {{retryCount}} {{retryLabel}} will retry automatically ({{lockedCount}} locked/deferred)',
-			folderChangesFailed: 'OneDrive 同步：有 {{count}} 个文件夹变更未能应用到 OneDrive。请启用调试日志查看详情。',
+			folderChangesFailed:
+				'OneDrive 同步：有 {{count}} 个文件夹变更未能应用到 OneDrive。请启用调试日志查看详情。',
 			engineFailed: 'OneDrive 同步失败：{{message}}',
 		},
 		reconcile: {

@@ -196,16 +196,24 @@ vi.mock('../../src/ui/settings', () => ({
 
 vi.mock('../../src/ui/statusBar', () => ({
 	StatusBarManager: mocks.StatusBarManager,
-	SyncStatus: { IDLE: 'idle', SYNCING: 'syncing', ERROR: 'error', DISCONNECTED: 'disconnected' },
+	SyncStatus: {
+		LOCKED: 'locked',
+		IDLE: 'idle',
+		SYNCING: 'syncing',
+		ERROR: 'error',
+		DISCONNECTED: 'disconnected',
+	},
 }));
 
 vi.mock('../../src/ui/authModal', () => ({
 	DeviceCodeModal: mocks.DeviceCodeModal,
 }));
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import OneDriveSyncPlugin from '../../src/main';
 import { DEFAULT_SETTINGS, OneDriveAccessMode } from '../../src/types';
+import { MemoryRemote } from '../fixtures/memoryRemote';
+import { CryptomatorStorage } from '../../src/storage/cryptomatorStorage';
 
 const createApp = () => ({
 	vault: {
@@ -842,12 +850,12 @@ describe('OneDriveSyncPlugin', () => {
 		// as a post-construction setter that is easy to forget.
 		// The 5th constructor argument (index 4) is syncOnFileChange.
 		expect(mocks.EventManager).toHaveBeenCalledWith(
-			expect.anything(),       // app
-			expect.any(Function),    // onSyncTriggered
-			expect.anything(),       // stateManager
-			expect.any(Function),    // shouldSyncPath
-			false,                   // syncOnFileChange — persisted value
-			3000                     // fileChangeSyncDelayMs — default
+			expect.anything(), // app
+			expect.any(Function), // onSyncTriggered
+			expect.anything(), // stateManager
+			expect.any(Function), // shouldSyncPath
+			false, // syncOnFileChange — persisted value
+			3000 // fileChangeSyncDelayMs — default
 		);
 	});
 
@@ -905,4 +913,154 @@ describe('OneDriveSyncPlugin', () => {
 		expect(mocks.eventManager.setFileChangeSyncDelay).toHaveBeenLastCalledWith(10000);
 	});
 
+	describe('encrypted storage lifecycle', () => {
+		let secrets: Map<string, string>;
+		beforeEach(async () => {
+			await plugin.onload();
+			secrets = new Map();
+			(plugin as any).app.secretStorage = {
+				getSecret: (key: string) => secrets.get(key),
+				setSecret: (key: string, value: string) => secrets.set(key, value),
+			};
+			const raw = new MemoryRemote();
+			const client = {
+				getUserInfo: mocks.oneDriveClient.getUserInfo,
+				isSharedDrive: () => false,
+				resolveAppFolderPath: async () => '/Apps/ObsidianOneDrive',
+				getDelta: raw.getDelta.bind(raw),
+			};
+			mocks.OneDriveClient.mockImplementation(function () {
+				return client;
+			});
+			mocks.FileOperations.mockImplementation(function () {
+				return raw.files;
+			});
+			(plugin as any).oneDriveClient = client;
+			(plugin as any).fileOps = raw.files;
+			mocks.tokenStorage.hasTokens.mockReturnValue(true);
+		});
+		afterEach(() => {
+			mocks.OneDriveClient.mockImplementation(function () {
+				return mocks.oneDriveClient;
+			});
+			mocks.FileOperations.mockImplementation(function () {
+				return {};
+			});
+		});
+		it('creates and verifies storage before switching, and saves keys only to SecretStorage', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			expect(plugin.settings.encryption?.folder).toBe('encrypted');
+			expect(secrets.size).toBe(1);
+			const key = Array.from(secrets.values())[0];
+			expect(key).toHaveLength(88);
+			const saved = JSON.stringify((plugin as any).saveData.mock.calls.at(-1)[0]);
+			expect(saved).not.toContain('private password');
+			expect(saved).not.toContain(key);
+			expect(mocks.SyncEngine.mock.calls.at(-1)[1]).toBeInstanceOf(CryptomatorStorage);
+			expect(mocks.SyncEngine.mock.calls.at(-1)[2]).toBeInstanceOf(CryptomatorStorage);
+		});
+		it('retains the previous destination and keys when remote setup is interrupted', async () => {
+			const raw = (plugin as any).fileOps;
+			await raw.uploadFile(
+				'plaintext/note.md',
+				new TextEncoder().encode('preserve original').buffer
+			);
+			plugin.settings.appFolderSubpath = 'plaintext';
+			const exclusive = raw.uploadExclusive.bind(raw);
+			raw.uploadExclusive = async (path: string, content: ArrayBuffer) => {
+				if (path.endsWith('/vault.cryptomator')) throw new Error('simulated interruption');
+				return exclusive(path, content);
+			};
+			await expect(
+				plugin.configureEncryptedSync('encrypted', 'private password', true, true)
+			).rejects.toThrow('simulated interruption');
+			expect(plugin.settings.encryption).toBeUndefined();
+			expect(plugin.settings.appFolderSubpath).toBe('plaintext');
+			expect(new TextDecoder().decode(await raw.downloadFileByPath('plaintext/note.md'))).toBe(
+				'preserve original'
+			);
+			const masterkey = await raw.downloadFileByPath('encrypted/masterkey.cryptomator');
+			await expect(
+				plugin.configureEncryptedSync('encrypted', 'private password', true, true)
+			).rejects.toThrow('already exists');
+			expect(
+				new Uint8Array(await raw.downloadFileByPath('encrypted/masterkey.cryptomator'))
+			).toEqual(new Uint8Array(masterkey));
+			expect(secrets.size).toBe(0);
+		});
+		it('auto-unlocks after a restart but never falls back to plaintext when the saved key is missing', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			(plugin as any).encryptedStorage.close();
+			(plugin as any).encryptedStorage = undefined;
+			await (plugin as any).initializeAuthenticatedComponents();
+			expect((plugin as any).remoteStorage).toBeInstanceOf(CryptomatorStorage);
+			(plugin as any).encryptedStorage.close();
+			(plugin as any).encryptedStorage = undefined;
+			secrets.clear();
+			mocks.SyncEngine.mockClear();
+			await (plugin as any).initializeAuthenticatedComponents();
+			expect(mocks.SyncEngine).not.toHaveBeenCalled();
+			expect((plugin as any).remoteStorage).toBeUndefined();
+			expect(plugin.getSyncStatusInfo().status).toBe('locked');
+		});
+		it('persists an explicit lock across initialization and forgets only its device key', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			secrets.set('unrelated', 'preserve');
+			await plugin.lockEncryptedSync(true);
+			expect(plugin.settings.encryption?.locked).toBe(true);
+			expect(plugin.settings.encryption?.rememberKey).toBe(false);
+			expect(secrets.get('unrelated')).toBe('preserve');
+			expect(secrets.get(`onedrive-e2ee-${plugin.settings.encryption!.scope}`)).toBe('');
+			mocks.SyncEngine.mockClear();
+			await (plugin as any).initializeAuthenticatedComponents();
+			expect(mocks.SyncEngine).not.toHaveBeenCalled();
+		});
+		it('waits for active sync operations before clearing the key on lock', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			const close = vi.spyOn((plugin as any).encryptedStorage, 'close');
+			const previousWindow = globalThis.window;
+			vi.stubGlobal('window', {
+				setTimeout: (callback: () => void, delay: number) => setTimeout(callback, delay),
+			});
+			try {
+				(plugin as any).isSyncing = true;
+				const lock = plugin.lockEncryptedSync();
+				expect(close).not.toHaveBeenCalled();
+				expect(plugin.settings.encryption!.locked).toBe(true);
+				(plugin as any).isSyncing = false;
+				await lock;
+				expect(close).toHaveBeenCalled();
+			} finally {
+				vi.stubGlobal('window', previousWindow);
+			}
+		});
+		it('does not reinstall an encrypted backend when initialization finishes after disconnect', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			let finishAccount!: (value: unknown) => void;
+			mocks.oneDriveClient.getUserInfo.mockClear();
+			mocks.oneDriveClient.getUserInfo.mockImplementationOnce(
+				() =>
+					new Promise((resolve) => {
+						finishAccount = resolve;
+					})
+			);
+			const pending = (plugin as any).initializeAuthenticatedComponents();
+			await vi.waitFor(() => expect(mocks.oneDriveClient.getUserInfo).toHaveBeenCalled());
+			await plugin.disconnect();
+			finishAccount({ id: '1' });
+			await pending;
+			expect((plugin as any).syncEngine).toBeUndefined();
+			expect((plugin as any).remoteStorage).toBeUndefined();
+			expect((plugin as any).encryptedStorage.isLocked).toBe(true);
+		});
+		it('refuses account changes and target changes without reusing a different vault key', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			mocks.oneDriveClient.getUserInfo.mockResolvedValue({ id: 'another-account' });
+			mocks.SyncEngine.mockClear();
+			await (plugin as any).initializeAuthenticatedComponents();
+			expect(mocks.SyncEngine).not.toHaveBeenCalled();
+			expect((plugin as any).remoteStorage).toBeUndefined();
+			await expect(plugin.onAppFolderSubpathChanged('plaintext')).rejects.toThrow('bound');
+		});
+	});
 });

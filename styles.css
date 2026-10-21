@@ -710,3 +710,10 @@
 	padding: 8px;
 	color: var(--text-muted);
 }
+.onedrive-encryption-controls {
+	flex-wrap: wrap;
+}
+
+.onedrive-encryption-destination {
+	overflow-wrap: anywhere;
+}

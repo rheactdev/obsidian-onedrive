@@ -61,30 +61,45 @@ describe('OneDriveClient', () => {
 
 		it('builds the app folder endpoint with a path', () => {
 			const encoded = encodePathForGraph('folder name/file#.md');
-			expect(client.buildEndpoint('folder name/file#.md')).toBe(`/me/drive/special/approot:/${encoded}`);
+			expect(client.buildEndpoint('folder name/file#.md')).toBe(
+				`/me/drive/special/approot:/${encoded}`
+			);
 		});
 
 		it('builds the app folder endpoint with a path and suffix', () => {
 			const encoded = encodePathForGraph('folder name/file#.md');
-			expect(client.buildEndpoint('folder name/file#.md', 'children')).toBe(`/me/drive/special/approot:/${encoded}:/children`);
+			expect(client.buildEndpoint('folder name/file#.md', 'children')).toBe(
+				`/me/drive/special/approot:/${encoded}:/children`
+			);
 		});
 
 		it('builds the full access root endpoint', () => {
-			const fullAccessClient = new OneDriveClient(mockAuthProvider as any, OneDriveAccessMode.FULL_ACCESS);
+			const fullAccessClient = new OneDriveClient(
+				mockAuthProvider as any,
+				OneDriveAccessMode.FULL_ACCESS
+			);
 			expect(fullAccessClient.buildEndpoint('')).toBe('/me/drive/root');
 		});
 
 		it('builds the full access endpoint with a path', () => {
-			const fullAccessClient = new OneDriveClient(mockAuthProvider as any, OneDriveAccessMode.FULL_ACCESS);
+			const fullAccessClient = new OneDriveClient(
+				mockAuthProvider as any,
+				OneDriveAccessMode.FULL_ACCESS
+			);
 			const encoded = encodePathForGraph('folder name/file#.md');
-			expect(fullAccessClient.buildEndpoint('folder name/file#.md')).toBe(`/me/drive/root:/${encoded}`);
+			expect(fullAccessClient.buildEndpoint('folder name/file#.md')).toBe(
+				`/me/drive/root:/${encoded}`
+			);
 		});
 
 		it('never emits an app-folder (approot) endpoint in Full Access mode — required for work/school accounts', () => {
 			// Work and school accounts are restricted to Full Access mode (Microsoft
 			// Graph does not offer Files.ReadWrite.AppFolder to them), so
 			// buildEndpoint() must never fall back to the approot shape here.
-			const fullAccessClient = new OneDriveClient(mockAuthProvider as any, OneDriveAccessMode.FULL_ACCESS);
+			const fullAccessClient = new OneDriveClient(
+				mockAuthProvider as any,
+				OneDriveAccessMode.FULL_ACCESS
+			);
 			const paths = ['', 'Notes', 'folder/sub folder/file#.md'];
 			const suffixes: (string | undefined)[] = [undefined, 'children', 'delta'];
 
@@ -102,19 +117,25 @@ describe('OneDriveClient', () => {
 
 		it('builds the shared drive root endpoint with a suffix', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared');
-			expect(client.buildEndpoint('', 'children')).toBe('/drives/drive-123/items/item-456/children');
+			expect(client.buildEndpoint('', 'children')).toBe(
+				'/drives/drive-123/items/item-456/children'
+			);
 		});
 
 		it('builds the shared drive endpoint with a path', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared');
 			const encoded = encodePathForGraph('folder name/file#.md');
-			expect(client.buildEndpoint('folder name/file#.md')).toBe(`/drives/drive-123/items/item-456:/${encoded}`);
+			expect(client.buildEndpoint('folder name/file#.md')).toBe(
+				`/drives/drive-123/items/item-456:/${encoded}`
+			);
 		});
 
 		it('builds the shared drive endpoint with a path and suffix', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared');
 			const encoded = encodePathForGraph('folder name/file#.md');
-			expect(client.buildEndpoint('folder name/file#.md', 'content')).toBe(`/drives/drive-123/items/item-456:/${encoded}:/content`);
+			expect(client.buildEndpoint('folder name/file#.md', 'content')).toBe(
+				`/drives/drive-123/items/item-456:/${encoded}:/content`
+			);
 		});
 
 		it('strips leading and trailing slashes from paths', () => {
@@ -126,26 +147,34 @@ describe('OneDriveClient', () => {
 		it('prepends relativePathInShared for shared drive endpoints', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared', 'Vaults/MyVault');
 			const encoded = encodePathForGraph('Vaults/MyVault/notes/test.md');
-			expect(client.buildEndpoint('notes/test.md')).toBe(`/drives/drive-123/items/item-456:/${encoded}`);
+			expect(client.buildEndpoint('notes/test.md')).toBe(
+				`/drives/drive-123/items/item-456:/${encoded}`
+			);
 		});
 
 		it('prepends relativePathInShared for shared drive root with suffix', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared', 'Vaults/MyVault');
 			const encoded = encodePathForGraph('Vaults/MyVault');
-			expect(client.buildEndpoint('', 'children')).toBe(`/drives/drive-123/items/item-456:/${encoded}:/children`);
+			expect(client.buildEndpoint('', 'children')).toBe(
+				`/drives/drive-123/items/item-456:/${encoded}:/children`
+			);
 		});
 
 		it('does not prepend relativePathInShared when it is empty', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared', '');
 			expect(client.buildEndpoint('')).toBe('/drives/drive-123/items/item-456');
 			const encoded = encodePathForGraph('notes/test.md');
-			expect(client.buildEndpoint('notes/test.md')).toBe(`/drives/drive-123/items/item-456:/${encoded}`);
+			expect(client.buildEndpoint('notes/test.md')).toBe(
+				`/drives/drive-123/items/item-456:/${encoded}`
+			);
 		});
 
 		it('prepends relativePathInShared with suffix for nested path', () => {
 			client.setRemoteDrive('drive-123', 'item-456', 'Shared', 'Vaults/MyVault');
 			const encoded = encodePathForGraph('Vaults/MyVault/notes/test.md');
-			expect(client.buildEndpoint('notes/test.md', 'content')).toBe(`/drives/drive-123/items/item-456:/${encoded}:/content`);
+			expect(client.buildEndpoint('notes/test.md', 'content')).toBe(
+				`/drives/drive-123/items/item-456:/${encoded}:/content`
+			);
 		});
 	});
 
@@ -212,7 +241,9 @@ describe('OneDriveClient', () => {
 			mockApiGet.mockRejectedValue(new Error('missing'));
 
 			await expect(client.getItemByPath('folder/file.md')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.getItemByPath('folder/file.md')).rejects.toThrow('Failed to get item: missing');
+			await expect(client.getItemByPath('folder/file.md')).rejects.toThrow(
+				'Failed to get item: missing'
+			);
 		});
 	});
 
@@ -229,18 +260,18 @@ describe('OneDriveClient', () => {
 	});
 
 	describe('listFoldersForPicker', () => {
-			const folderItem = { id: 'folder-1', name: 'Folder', folder: { childCount: 0 } };
-			const sharedFolderItem = {
-				id: 'folder-2',
+		const folderItem = { id: 'folder-1', name: 'Folder', folder: { childCount: 0 } };
+		const sharedFolderItem = {
+			id: 'folder-2',
+			name: 'Shared Folder',
+			remoteItem: {
+				id: 'remote-1',
 				name: 'Shared Folder',
-				remoteItem: {
-					id: 'remote-1',
-					name: 'Shared Folder',
-					folder: { childCount: 1 },
-					parentReference: { driveId: 'drive-123' },
-				},
-			};
-			const fileItem = { id: 'file-1', name: 'note.md', file: { mimeType: 'text/markdown' } };
+				folder: { childCount: 1 },
+				parentReference: { driveId: 'drive-123' },
+			},
+		};
+		const fileItem = { id: 'file-1', name: 'note.md', file: { mimeType: 'text/markdown' } };
 
 		it('uses the own-drive root endpoint at the root path', async () => {
 			mockApiGet.mockResolvedValue({ value: [folderItem] });
@@ -253,14 +284,18 @@ describe('OneDriveClient', () => {
 			const encoded = encodePathForGraph('Folder Name/Sub Folder');
 			mockApiGet.mockResolvedValue({ value: [folderItem] });
 
-			await expect(client.listFoldersForPicker('Folder Name/Sub Folder')).resolves.toEqual([folderItem]);
+			await expect(client.listFoldersForPicker('Folder Name/Sub Folder')).resolves.toEqual([
+				folderItem,
+			]);
 			expect(mockClient.api).toHaveBeenCalledWith(`/me/drive/root:/${encoded}:/children`);
 		});
 
 		it('uses the shared-drive root endpoint', async () => {
 			mockApiGet.mockResolvedValue({ value: [folderItem] });
 
-			await expect(client.listFoldersForPicker('', 'drive-123', 'item-456')).resolves.toEqual([folderItem]);
+			await expect(client.listFoldersForPicker('', 'drive-123', 'item-456')).resolves.toEqual([
+				folderItem,
+			]);
 			expect(mockClient.api).toHaveBeenCalledWith('/drives/drive-123/items/item-456/children');
 		});
 
@@ -268,8 +303,12 @@ describe('OneDriveClient', () => {
 			const encoded = encodePathForGraph('Folder Name/Sub Folder');
 			mockApiGet.mockResolvedValue({ value: [folderItem] });
 
-			await expect(client.listFoldersForPicker('', 'drive-123', 'item-456', 'Folder Name/Sub Folder')).resolves.toEqual([folderItem]);
-			expect(mockClient.api).toHaveBeenCalledWith(`/drives/drive-123/items/item-456:/${encoded}:/children`);
+			await expect(
+				client.listFoldersForPicker('', 'drive-123', 'item-456', 'Folder Name/Sub Folder')
+			).resolves.toEqual([folderItem]);
+			expect(mockClient.api).toHaveBeenCalledWith(
+				`/drives/drive-123/items/item-456:/${encoded}:/children`
+			);
 		});
 
 		it('filters results to folders and shared folder shortcuts', async () => {
@@ -295,7 +334,9 @@ describe('OneDriveClient', () => {
 
 		it('falls back to getItemByPath when the folder already exists', async () => {
 			const existingItem = { id: 'folder-1', name: 'New Folder' };
-			const getItemByPathSpy = vi.spyOn(client, 'getItemByPath').mockResolvedValue(existingItem as any);
+			const getItemByPathSpy = vi
+				.spyOn(client, 'getItemByPath')
+				.mockResolvedValue(existingItem as any);
 			mockApiPost.mockRejectedValue(new Error('nameAlreadyExists'));
 
 			await expect(client.createFolder('parent', 'New Folder')).resolves.toBe(existingItem as any);
@@ -327,7 +368,10 @@ describe('OneDriveClient', () => {
 		});
 
 		it('keeps the root children alias in full access mode', async () => {
-			const fullAccessClient = new OneDriveClient(mockAuthProvider as any, OneDriveAccessMode.FULL_ACCESS);
+			const fullAccessClient = new OneDriveClient(
+				mockAuthProvider as any,
+				OneDriveAccessMode.FULL_ACCESS
+			);
 			mockApiPost.mockResolvedValue({ id: 'folder-1', name: 'TaskForge' });
 
 			await fullAccessClient.createFolder('', 'TaskForge');
@@ -350,7 +394,9 @@ describe('OneDriveClient', () => {
 			mockApiDelete.mockRejectedValue(new Error('forbidden'));
 
 			await expect(client.deleteItem('item-123')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.deleteItem('item-123')).rejects.toThrow('Failed to delete item: forbidden');
+			await expect(client.deleteItem('item-123')).rejects.toThrow(
+				'Failed to delete item: forbidden'
+			);
 		});
 	});
 
@@ -381,7 +427,9 @@ describe('OneDriveClient', () => {
 			mockApiGet.mockResolvedValue({ id: 'item-123', name: 'file.md' });
 
 			await expect(client.downloadFile('item-123')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.downloadFile('item-123')).rejects.toThrow('Failed to download file: No download URL available');
+			await expect(client.downloadFile('item-123')).rejects.toThrow(
+				'Failed to download file: No download URL available'
+			);
 		});
 
 		it('throws OneDriveError when the binary fetch fails', async () => {
@@ -393,7 +441,9 @@ describe('OneDriveClient', () => {
 			mockRequestUrl.mockResolvedValue({ status: 500, text: 'Server Error' });
 
 			await expect(client.downloadFile('item-123')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.downloadFile('item-123')).rejects.toThrow('Failed to download file: HTTP 500: Server Error');
+			await expect(client.downloadFile('item-123')).rejects.toThrow(
+				'Failed to download file: HTTP 500: Server Error'
+			);
 		});
 
 		it('downloads large files in ranged chunks instead of one request', async () => {
@@ -411,12 +461,14 @@ describe('OneDriveClient', () => {
 				new Uint8Array(chunkSize).fill(2),
 				new Uint8Array(10).fill(3),
 			];
-			mockRequestUrl.mockImplementation(async ({ headers }: { headers?: Record<string, string> }) => {
-				const range = headers?.Range;
-				const start = Number(range?.split('=')[1].split('-')[0]);
-				const index = start / chunkSize;
-				return { status: 206, text: '', arrayBuffer: chunks[index].buffer };
-			});
+			mockRequestUrl.mockImplementation(
+				async ({ headers }: { headers?: Record<string, string> }) => {
+					const range = headers?.Range;
+					const start = Number(range?.split('=')[1].split('-')[0]);
+					const index = start / chunkSize;
+					return { status: 206, text: '', arrayBuffer: chunks[index].buffer };
+				}
+			);
 
 			const result = await client.downloadFile('item-123');
 
@@ -465,7 +517,9 @@ describe('OneDriveClient', () => {
 			mockRequestUrl.mockResolvedValue({ status: 500, text: 'Server Error' });
 
 			await expect(client.downloadFile('item-123')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.downloadFile('item-123')).rejects.toThrow('Failed to download file: HTTP 500: Server Error');
+			await expect(client.downloadFile('item-123')).rejects.toThrow(
+				'Failed to download file: HTTP 500: Server Error'
+			);
 		});
 	});
 
@@ -513,11 +567,16 @@ describe('OneDriveClient', () => {
 		});
 
 		it('uses a full-access remote path delta endpoint on the first call', async () => {
-			const fullAccessClient = new OneDriveClient(mockAuthProvider as any, OneDriveAccessMode.FULL_ACCESS);
+			const fullAccessClient = new OneDriveClient(
+				mockAuthProvider as any,
+				OneDriveAccessMode.FULL_ACCESS
+			);
 			const encoded = encodePathForGraph('Folder Name/Sub Folder');
 			mockApiGet.mockResolvedValue({ value: [item1], '@odata.deltaLink': 'delta-1' });
 
-			await expect(fullAccessClient.getDelta(undefined, '/Folder Name/Sub Folder')).resolves.toEqual({ items: [item1], deltaLink: 'delta-1' });
+			await expect(
+				fullAccessClient.getDelta(undefined, '/Folder Name/Sub Folder')
+			).resolves.toEqual({ items: [item1], deltaLink: 'delta-1' });
 			expect(mockClient.api).toHaveBeenCalledWith(`/me/drive/root:/${encoded}:/delta`);
 		});
 
@@ -532,7 +591,10 @@ describe('OneDriveClient', () => {
 		it('uses the provided delta link directly', async () => {
 			mockApiGet.mockResolvedValue({ value: [item1], '@odata.deltaLink': 'delta-1' });
 
-			await expect(client.getDelta('https://delta.example/token')).resolves.toEqual({ items: [item1], deltaLink: 'delta-1' });
+			await expect(client.getDelta('https://delta.example/token')).resolves.toEqual({
+				items: [item1],
+				deltaLink: 'delta-1',
+			});
 			expect(mockClient.api).toHaveBeenCalledWith('https://delta.example/token');
 		});
 
@@ -541,7 +603,10 @@ describe('OneDriveClient', () => {
 				.mockResolvedValueOnce({ value: [item1], '@odata.nextLink': 'next-url' })
 				.mockResolvedValueOnce({ value: [item2], '@odata.deltaLink': 'new-delta' });
 
-			await expect(client.getDelta()).resolves.toEqual({ items: [item1, item2], deltaLink: 'new-delta' });
+			await expect(client.getDelta()).resolves.toEqual({
+				items: [item1, item2],
+				deltaLink: 'new-delta',
+			});
 			expect(mockClient.api).toHaveBeenNthCalledWith(1, '/me/drive/special/approot/delta');
 			expect(mockClient.api).toHaveBeenNthCalledWith(2, 'next-url');
 		});
@@ -551,7 +616,11 @@ describe('OneDriveClient', () => {
 				.mockRejectedValueOnce(new Error('resyncRequired'))
 				.mockResolvedValueOnce({ value: [item1], '@odata.deltaLink': 'fresh-delta' });
 
-			await expect(client.getDelta('https://delta.example/token')).resolves.toEqual({ items: [item1], deltaLink: 'fresh-delta' });
+			await expect(client.getDelta('https://delta.example/token')).resolves.toEqual({
+				items: [item1],
+				deltaLink: 'fresh-delta',
+				reset: true,
+			});
 			expect(mockClient.api).toHaveBeenNthCalledWith(1, 'https://delta.example/token');
 			expect(mockClient.api).toHaveBeenNthCalledWith(2, '/me/drive/special/approot/delta');
 		});
@@ -559,8 +628,12 @@ describe('OneDriveClient', () => {
 		it('throws OneDriveError for other delta errors', async () => {
 			mockApiGet.mockRejectedValue(new Error('network down'));
 
-			await expect(client.getDelta('https://delta.example/token')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.getDelta('https://delta.example/token')).rejects.toThrow('Failed to get delta: network down');
+			await expect(client.getDelta('https://delta.example/token')).rejects.toBeInstanceOf(
+				OneDriveError
+			);
+			await expect(client.getDelta('https://delta.example/token')).rejects.toThrow(
+				'Failed to get delta: network down'
+			);
 		});
 
 		// Shared drive with vault nested inside the shared folder
@@ -570,7 +643,9 @@ describe('OneDriveClient', () => {
 
 			await client.getDelta();
 			const encoded = encodePathForGraph('Vaults/MyVault');
-			expect(mockClient.api).toHaveBeenCalledWith(`/drives/drive-123/items/item-456:/${encoded}:/delta`);
+			expect(mockClient.api).toHaveBeenCalledWith(
+				`/drives/drive-123/items/item-456:/${encoded}:/delta`
+			);
 		});
 
 		it('prepends relativePathInShared to subPath for shared-drive delta', async () => {
@@ -579,7 +654,9 @@ describe('OneDriveClient', () => {
 
 			await client.getDelta(undefined, '', '.obsidian');
 			const encoded = encodePathForGraph('Vaults/MyVault/.obsidian');
-			expect(mockClient.api).toHaveBeenCalledWith(`/drives/drive-123/items/item-456:/${encoded}:/delta`);
+			expect(mockClient.api).toHaveBeenCalledWith(
+				`/drives/drive-123/items/item-456:/${encoded}:/delta`
+			);
 		});
 
 		it('uses subPath alone for shared-drive delta when relativePathInShared is empty', async () => {
@@ -588,12 +665,17 @@ describe('OneDriveClient', () => {
 
 			await client.getDelta(undefined, '', '.obsidian');
 			const encoded = encodePathForGraph('.obsidian');
-			expect(mockClient.api).toHaveBeenCalledWith(`/drives/drive-123/items/item-456:/${encoded}:/delta`);
+			expect(mockClient.api).toHaveBeenCalledWith(
+				`/drives/drive-123/items/item-456:/${encoded}:/delta`
+			);
 		});
 
 		it('treats GraphError 404 on subPath as empty when no deltaLink (first sync)', async () => {
 			// Graph SDK throws GraphError with statusCode/code properties, not OneDriveError
-			const graphError = new Error('The resource could not be found.') as unknown as Record<string, unknown>;
+			const graphError = new Error('The resource could not be found.') as unknown as Record<
+				string,
+				unknown
+			>;
 			graphError.statusCode = 404;
 			graphError.code = 'itemNotFound';
 			mockApiGet.mockRejectedValueOnce(graphError);
@@ -673,15 +755,21 @@ describe('OneDriveClient', () => {
 				},
 			});
 
-			await expect(client.resolveSharedFolderPath('drive-123', 'item-456')).resolves.toBe('/Documents/Projects/Shared Folder');
+			await expect(client.resolveSharedFolderPath('drive-123', 'item-456')).resolves.toBe(
+				'/Documents/Projects/Shared Folder'
+			);
 			expect(mockClient.api).toHaveBeenCalledWith('/drives/drive-123/items/item-456');
 		});
 
 		it('throws OneDriveError when resolving the shared folder path fails', async () => {
 			mockApiGet.mockRejectedValue(new Error('not found'));
 
-			await expect(client.resolveSharedFolderPath('drive-123', 'item-456')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.resolveSharedFolderPath('drive-123', 'item-456')).rejects.toThrow('Failed to resolve shared folder: not found');
+			await expect(client.resolveSharedFolderPath('drive-123', 'item-456')).rejects.toBeInstanceOf(
+				OneDriveError
+			);
+			await expect(client.resolveSharedFolderPath('drive-123', 'item-456')).rejects.toThrow(
+				'Failed to resolve shared folder: not found'
+			);
 		});
 	});
 
@@ -740,14 +828,18 @@ describe('OneDriveClient', () => {
 
 			const result = await client.listAppFoldersForPicker('Vault1');
 			expect(result).toEqual([folder]);
-			expect(mockClient.api).toHaveBeenCalledWith(`/me/drive/special/approot:/${encodePathForGraph('Vault1')}:/children`);
+			expect(mockClient.api).toHaveBeenCalledWith(
+				`/me/drive/special/approot:/${encodePathForGraph('Vault1')}:/children`
+			);
 		});
 
 		it('throws OneDriveError when the API call fails', async () => {
 			mockApiGet.mockRejectedValue(new Error('forbidden'));
 
 			await expect(client.listAppFoldersForPicker()).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.listAppFoldersForPicker()).rejects.toThrow('Failed to list folders: forbidden');
+			await expect(client.listAppFoldersForPicker()).rejects.toThrow(
+				'Failed to list folders: forbidden'
+			);
 		});
 	});
 
@@ -812,7 +904,9 @@ describe('OneDriveClient', () => {
 
 		it('throws OneDriveError for empty path', async () => {
 			await expect(client.moveItem('item-1', '')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.moveItem('item-1', '')).rejects.toThrow('Invalid move destination: empty path');
+			await expect(client.moveItem('item-1', '')).rejects.toThrow(
+				'Invalid move destination: empty path'
+			);
 		});
 
 		it('throws OneDriveError when the move fails', async () => {
@@ -820,7 +914,9 @@ describe('OneDriveClient', () => {
 			mockApiPatch.mockRejectedValue(new Error('conflict'));
 
 			await expect(client.moveItem('item-1', 'dest/file.md')).rejects.toBeInstanceOf(OneDriveError);
-			await expect(client.moveItem('item-1', 'other/file.md')).rejects.toThrow('Failed to move item: conflict');
+			await expect(client.moveItem('item-1', 'other/file.md')).rejects.toThrow(
+				'Failed to move item: conflict'
+			);
 		});
 	});
 

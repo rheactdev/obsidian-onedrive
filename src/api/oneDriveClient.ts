@@ -35,7 +35,13 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { requestUrl } from 'obsidian';
 import { OneDriveAuthProvider } from '../auth/authProvider';
-import { OneDriveItem, OneDriveUser, OneDriveError, OneDriveAccessMode, DeltaResponse } from '../types';
+import {
+	OneDriveItem,
+	OneDriveUser,
+	OneDriveError,
+	OneDriveAccessMode,
+	DeltaResponse,
+} from '../types';
 import { logger } from '../utils/logger';
 import { retryWithBackoff } from '../utils/retry';
 import { encodePathForGraph, stripGraphPrefix } from '../utils/pathUtils';
@@ -72,7 +78,10 @@ export class OneDriveClient {
 	// Item id of the App Folder, resolved on first use (see folderChildrenEndpoint)
 	private appRootId?: string;
 
-	constructor(authProvider: OneDriveAuthProvider, accessMode: OneDriveAccessMode = OneDriveAccessMode.APP_FOLDER) {
+	constructor(
+		authProvider: OneDriveAuthProvider,
+		accessMode: OneDriveAccessMode = OneDriveAccessMode.APP_FOLDER
+	) {
 		this.authProvider = authProvider;
 		this.accessMode = accessMode;
 		this.client = Client.initWithMiddleware({
@@ -95,7 +104,9 @@ export class OneDriveClient {
 		this.remoteItemId = itemId;
 		this.remoteRootName = rootName;
 		this.relativePathInShared = relativePath.replace(/^\/+|\/+$/g, '');
-		logger.info(`Configured shared drive: driveId=${driveId}, itemId=${itemId}, rootName=${rootName}, relativePath=${this.relativePathInShared || '(root)'}`);
+		logger.info(
+			`Configured shared drive: driveId=${driveId}, itemId=${itemId}, rootName=${rootName}, relativePath=${this.relativePathInShared || '(root)'}`
+		);
 	}
 
 	/**
@@ -124,7 +135,9 @@ export class OneDriveClient {
 			// "Jeff Documents/ObsidianVaults/JeffBrain", relative is
 			// "ObsidianVaults/JeffBrain"
 			const fullPath = this.relativePathInShared
-				? (cleanPath ? `${this.relativePathInShared}/${cleanPath}` : this.relativePathInShared)
+				? cleanPath
+					? `${this.relativePathInShared}/${cleanPath}`
+					: this.relativePathInShared
 				: cleanPath;
 			const encodedPath = fullPath ? encodePathForGraph(fullPath) : '';
 			if (!encodedPath) {
@@ -132,9 +145,7 @@ export class OneDriveClient {
 				return suffix ? `${base}/${suffix}` : base;
 			}
 			// Nested path within shared folder
-			return suffix
-				? `${base}:/${encodedPath}:/${suffix}`
-				: `${base}:/${encodedPath}`;
+			return suffix ? `${base}:/${encodedPath}:/${suffix}` : `${base}:/${encodedPath}`;
 		}
 
 		const encodedPath = cleanPath ? encodePathForGraph(cleanPath) : '';
@@ -144,9 +155,7 @@ export class OneDriveClient {
 			if (!encodedPath) {
 				return suffix ? `${base}/${suffix}` : base;
 			}
-			return suffix
-				? `${base}:/${encodedPath}:/${suffix}`
-				: `${base}:/${encodedPath}`;
+			return suffix ? `${base}:/${encodedPath}:/${suffix}` : `${base}:/${encodedPath}`;
 		}
 
 		// Full access mode (non-shared)
@@ -154,9 +163,7 @@ export class OneDriveClient {
 		if (!encodedPath) {
 			return suffix ? `${base}/${suffix}` : base;
 		}
-		return suffix
-			? `${base}:/${encodedPath}:/${suffix}`
-			: `${base}:/${encodedPath}`;
+		return suffix ? `${base}:/${encodedPath}:/${suffix}` : `${base}:/${encodedPath}`;
 	}
 
 	/**
@@ -315,7 +322,11 @@ export class OneDriveClient {
 		sharedItemId?: string,
 		relativePathInShared?: string
 	): Promise<OneDriveItem[]> {
-		logger.debug('Listing folders for picker:', { folderPath, sharedDriveId, relativePathInShared });
+		logger.debug('Listing folders for picker:', {
+			folderPath,
+			sharedDriveId,
+			relativePathInShared,
+		});
 
 		try {
 			let apiPath: string;
@@ -474,7 +485,12 @@ export class OneDriveClient {
 			logger.debug('Item deleted successfully');
 		} catch (error) {
 			// 404 means the item is already gone — that's the outcome we wanted
-			if (error && typeof error === 'object' && 'statusCode' in error && (error as { statusCode: number }).statusCode === 404) {
+			if (
+				error &&
+				typeof error === 'object' &&
+				'statusCode' in error &&
+				(error as { statusCode: number }).statusCode === 404
+			) {
 				logger.debug(`Item ${itemId} already deleted (404) — treating as success`);
 				return;
 			}
@@ -521,8 +537,9 @@ export class OneDriveClient {
 				patchBody.parentReference = { id: rootItem.id };
 			}
 
-			const result = await retryWithBackoff<OneDriveItem>(() =>
-				this.client.api(this.getItemEndpoint(itemId)).patch(patchBody) as Promise<OneDriveItem>
+			const result = await retryWithBackoff<OneDriveItem>(
+				() =>
+					this.client.api(this.getItemEndpoint(itemId)).patch(patchBody) as Promise<OneDriveItem>
 			);
 
 			logger.info(`Moved item ${itemId} to ${newPath}`);
@@ -645,7 +662,11 @@ export class OneDriveClient {
 	 *                When the scoped folder does not yet exist remotely the call returns an empty
 	 *                result so the first sync can proceed and later create it via upload.
 	 */
-	async getDelta(deltaLink?: string, remotePath?: string, subPath?: string): Promise<DeltaResponse> {
+	async getDelta(
+		deltaLink?: string,
+		remotePath?: string,
+		subPath?: string
+	): Promise<DeltaResponse> {
 		logger.debug('Getting delta changes', { hasDeltaLink: !!deltaLink, remotePath, subPath });
 
 		const allItems: OneDriveItem[] = [];
@@ -666,7 +687,9 @@ export class OneDriveClient {
 				// root to the vault folder (empty when vault IS the shared root)
 				const relPrefix = this.relativePathInShared;
 				const fullSub = relPrefix
-					? (cleanSubPath ? `${relPrefix}/${cleanSubPath}` : relPrefix)
+					? cleanSubPath
+						? `${relPrefix}/${cleanSubPath}`
+						: relPrefix
 					: cleanSubPath;
 				if (fullSub) {
 					const encoded = encodePathForGraph(fullSub);
@@ -733,10 +756,14 @@ export class OneDriveClient {
 
 			// If the delta token is invalid/expired, do a full resync
 			const msg = error instanceof Error ? error.message.toLowerCase() : '';
-			if (deltaLink &&
-				(msg.includes('resyncrequired') || msg.includes('resync required') || msg.includes('invalidtoken'))) {
+			if (
+				deltaLink &&
+				(msg.includes('resyncrequired') ||
+					msg.includes('resync required') ||
+					msg.includes('invalidtoken'))
+			) {
 				logger.warn('Delta token expired, performing full resync');
-				return this.getDelta(undefined, remotePath, subPath); // Retry without token
+				return { ...(await this.getDelta(undefined, remotePath, subPath)), reset: true };
 			}
 
 			logger.error('Failed to get delta:', error);
@@ -757,7 +784,10 @@ export class OneDriveClient {
 			if (err.statusCode === 404) return true;
 			if (err.code === 'itemNotFound') return true;
 		}
-		if (error instanceof Error && /itemNotFound|404|resource could not be found/i.test(error.message)) {
+		if (
+			error instanceof Error &&
+			/itemNotFound|404|resource could not be found/i.test(error.message)
+		) {
 			return true;
 		}
 		return false;

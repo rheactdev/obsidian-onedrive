@@ -74,6 +74,11 @@ export class ChunkUploader {
 		return this.uploadLargeFile(filePath, content, onProgress);
 	}
 
+	/** Metadata must be created atomically, including when it fits in a single chunk. */
+	async uploadExclusive(filePath: string, content: ArrayBuffer): Promise<OneDriveItem> {
+		return this.uploadLargeFile(filePath, content, undefined, 'fail');
+	}
+
 	/**
 	 * Simple upload for files < 4MB
 	 * Uses requestUrl (Obsidian's cross-platform fetch wrapper) instead of the
@@ -111,9 +116,11 @@ export class ChunkUploader {
 			});
 		} catch (error) {
 			logger.error('Failed to upload small file:', error);
-			throw error instanceof OneDriveError ? error : new OneDriveError(
-				`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`
-			);
+			throw error instanceof OneDriveError
+				? error
+				: new OneDriveError(
+						`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`
+					);
 		}
 	}
 
@@ -123,7 +130,8 @@ export class ChunkUploader {
 	private async uploadLargeFile(
 		filePath: string,
 		content: ArrayBuffer,
-		onProgress?: (uploaded: number, total: number) => void
+		onProgress?: (uploaded: number, total: number) => void,
+		conflictBehavior: 'replace' | 'fail' = 'replace'
 	): Promise<OneDriveItem> {
 		const fileSize = content.byteLength;
 		const chunkSize = calculateChunkSize(fileSize);
@@ -131,7 +139,7 @@ export class ChunkUploader {
 		logger.debug('Using chunked upload', { fileSize, chunkSize });
 
 		// Step 1: Create upload session
-		const session = await this.createUploadSession(filePath);
+		const session = await this.createUploadSession(filePath, conflictBehavior);
 
 		// Step 2: Upload chunks sequentially (Graph requires in-order ranges).
 		// If a chunk fails after its retries, consult the session's
@@ -192,19 +200,23 @@ export class ChunkUploader {
 	/**
 	 * Create an upload session
 	 */
-	private async createUploadSession(filePath: string): Promise<OneDriveUploadSession> {
+	private async createUploadSession(
+		filePath: string,
+		conflictBehavior: 'replace' | 'fail' = 'replace'
+	): Promise<OneDriveUploadSession> {
 		logger.debug('Creating upload session for:', filePath);
 
 		try {
 			const graphClient = this.client.getClient();
 			const apiPath = this.client.buildEndpoint(filePath, 'createUploadSession');
 
-			return await retryWithBackoff<OneDriveUploadSession>(() =>
-				graphClient.api(apiPath).post({
-					item: {
-						'@microsoft.graph.conflictBehavior': 'replace',
-					},
-				}) as Promise<OneDriveUploadSession>
+			return await retryWithBackoff<OneDriveUploadSession>(
+				() =>
+					graphClient.api(apiPath).post({
+						item: {
+							'@microsoft.graph.conflictBehavior': conflictBehavior,
+						},
+					}) as Promise<OneDriveUploadSession>
 			);
 		} catch (error) {
 			logger.error('Failed to create upload session:', error);
