@@ -35,11 +35,6 @@ export interface StoredTokens {
 // ============================================================================
 
 export interface OneDriveItem {
-	eTag?: string;
-	cTag?: string;
-	/** Logical storage metadata; ciphertext size is never used as a plaintext size. */
-	ciphertextSize?: number;
-	contentVersion?: string;
 	id: string;
 	name: string;
 	size?: number;
@@ -111,7 +106,7 @@ export interface SyncState {
 export interface FileState {
 	path: string;
 	localMtime: number; // from Obsidian file.stat.mtime
-	remoteHash: string; // quickXorHash from OneDrive
+	remoteHash: string; // OneDrive quickXorHash, or the ciphertext content version in encrypted sync
 	size: number;
 	remoteModifiedTime: number;
 	oneDriveId?: string;
@@ -327,14 +322,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
 
 export interface PluginSettings {
 	/** Device-local configuration only. Unwrapped keys live exclusively in SecretStorage. */
-	encryption?: {
-		folder: string;
-		vaultId: string;
-		scope: string;
-		rememberKey: boolean;
-		locked: boolean;
-		cache?: import('./storage/cryptomatorStorage').EncryptedStorageState;
-	};
+	encryption?: import('./crypto/types').EncryptionSettings;
 	// Authentication
 	accountType: AccountType;
 	tenantId?: string; // Required when accountType is 'tenant'

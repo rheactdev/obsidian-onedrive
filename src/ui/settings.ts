@@ -47,6 +47,7 @@ function isOneOf<T extends string>(value: unknown, options: readonly T[]): value
 
 // Forward declaration for the plugin type
 interface OneDrivePlugin extends Plugin {
+	isEncryptionSupported(): boolean;
 	showEncryptionSetup(onClose?: () => void): void;
 	showEncryptionUnlock(onClose?: () => void): void;
 	lockEncryptedSync(forget?: boolean): Promise<void>;
@@ -254,7 +255,9 @@ export class OneDriveSettingTab extends PluginSettingTab {
 								[ConflictResolutionStrategy.CREATE_DUPLICATE]: t(
 									'settings.sync.conflictResolution.createDuplicate'
 								),
-								[ConflictResolutionStrategy.MANUAL]: t('settings.sync.conflictResolution.manual'),
+								[ConflictResolutionStrategy.MANUAL]: t(
+									'settings.sync.conflictResolution.manual'
+								),
 							},
 						},
 					},
@@ -581,10 +584,11 @@ export class OneDriveSettingTab extends PluginSettingTab {
 	private renderEncryptionSetting(setting: Setting): void {
 		setting.controlEl.addClass('onedrive-encryption-controls');
 		const config = this.plugin.settings.encryption;
+		const supported = this.plugin.isEncryptionSupported();
 		setting
 			.setName(t('encryption.heading'))
 			.setDesc(
-				config
+				!supported ? t('encryption.personalAppFolderOnly') : config
 					? `${config.folder} — ${t(config.locked || this.plugin.getSyncStatusInfo().status === SyncStatus.LOCKED ? 'encryption.locked' : 'encryption.enabled')}`
 					: t('encryption.description')
 			);
@@ -592,6 +596,7 @@ export class OneDriveSettingTab extends PluginSettingTab {
 			setting.addButton((button) =>
 				button
 					.setButtonText(t('encryption.setup'))
+					.setDisabled(!supported)
 					.onClick(() => this.plugin.showEncryptionSetup(() => this.refreshSettingsUi()))
 			);
 			return;
@@ -599,12 +604,13 @@ export class OneDriveSettingTab extends PluginSettingTab {
 		setting.addButton((button) =>
 			button
 				.setButtonText(t('encryption.change'))
+				.setDisabled(!supported)
 				.onClick(() => this.plugin.showEncryptionSetup(() => this.refreshSettingsUi()))
 		);
 		setting.addButton((button) =>
 			button
 				.setButtonText(t('encryption.unlock'))
-				.setDisabled(!config.locked && this.plugin.getSyncStatusInfo().status !== SyncStatus.LOCKED)
+				.setDisabled(!supported || (!config.locked && this.plugin.getSyncStatusInfo().status !== SyncStatus.LOCKED))
 				.onClick(() => this.plugin.showEncryptionUnlock(() => this.refreshSettingsUi()))
 		);
 		for (const forget of [false, true])
@@ -692,16 +698,14 @@ export class OneDriveSettingTab extends PluginSettingTab {
 	private renderTenantIdSetting(setting: Setting): void {
 		const isConnected = !!this.plugin.settings.connectedUser;
 		const desc = isConnected
-			? t('settings.auth.accountType.tenantIdDesc') +
-				t('settings.auth.accountType.reconnectRequired')
+			? t('settings.auth.accountType.tenantIdDesc') + t('settings.auth.accountType.reconnectRequired')
 			: t('settings.auth.accountType.tenantIdDesc');
 
 		setting
 			.setName(t('settings.auth.accountType.tenantIdName'))
 			.setDesc(desc)
 			.addText((text) => {
-				text
-					.setPlaceholder(t('settings.auth.accountType.tenantIdPlaceholder'))
+				text.setPlaceholder(t('settings.auth.accountType.tenantIdPlaceholder'))
 					.setValue(this.plugin.settings.tenantId || '')
 					.onChange(async (value) => {
 						this.plugin.settings.tenantId = value.trim() || undefined;
@@ -743,9 +747,7 @@ export class OneDriveSettingTab extends PluginSettingTab {
 			this.plugin.settings.accessMode === OneDriveAccessMode.FULL_ACCESS
 				? t('settings.auth.accessMode.fullAccessDesc')
 				: t('settings.auth.accessMode.appFolderDesc');
-		let desc = appFolderAllowed
-			? modeDesc
-			: `${modeDesc} ${t('settings.auth.accountType.appFolderUnavailable')}`;
+		let desc = appFolderAllowed ? modeDesc : `${modeDesc} ${t('settings.auth.accountType.appFolderUnavailable')}`;
 		if (isConnected) {
 			desc += t('settings.auth.accessMode.reconnectRequired');
 		}
@@ -755,10 +757,7 @@ export class OneDriveSettingTab extends PluginSettingTab {
 			.setDesc(desc)
 			.addDropdown((dropdown) => {
 				if (appFolderAllowed) {
-					dropdown.addOption(
-						OneDriveAccessMode.APP_FOLDER,
-						t('settings.auth.accessMode.appFolder')
-					);
+					dropdown.addOption(OneDriveAccessMode.APP_FOLDER, t('settings.auth.accessMode.appFolder'));
 				}
 				dropdown
 					.addOption(OneDriveAccessMode.FULL_ACCESS, t('settings.auth.accessMode.fullAccess'))
@@ -1031,16 +1030,14 @@ export class OneDriveSettingTab extends PluginSettingTab {
 	private renderCustomClientIdSetting(setting: Setting): void {
 		const isRequired = this.plugin.settings.accountType !== 'personal';
 		const desc = isRequired
-			? t('settings.advanced.customClientId.desc') +
-				t('settings.advanced.customClientId.requiredNote')
+			? t('settings.advanced.customClientId.desc') + t('settings.advanced.customClientId.requiredNote')
 			: t('settings.advanced.customClientId.desc');
 
 		setting
 			.setName(t('settings.advanced.customClientId.name'))
 			.setDesc(desc)
 			.addText((text) => {
-				text
-					.setPlaceholder(DEFAULT_ONEDRIVE_CLIENT_ID)
+				text.setPlaceholder(DEFAULT_ONEDRIVE_CLIENT_ID)
 					.setValue(this.plugin.settings.customClientId || '')
 					.onChange(async (value) => {
 						this.plugin.settings.customClientId = value.trim() || undefined;
@@ -1110,12 +1107,12 @@ export class OneDriveSettingTab extends PluginSettingTab {
 			);
 
 			// Disconnect button
-			statusSetting.addButton((button) =>
-				button.setButtonText(t('settings.auth.connectionStatus.disconnect')).onClick(async () => {
-					await this.plugin.disconnect();
-					this.renderSettings();
-				})
-			);
+				statusSetting.addButton((button) =>
+					button.setButtonText(t('settings.auth.connectionStatus.disconnect')).onClick(async () => {
+						await this.plugin.disconnect();
+						this.renderSettings();
+					})
+				);
 		} else {
 			statusSetting.setDesc(t('settings.auth.connectionStatus.notConnected'));
 
@@ -1123,19 +1120,19 @@ export class OneDriveSettingTab extends PluginSettingTab {
 			statusSetting.addButton((button) =>
 				button
 					.setButtonText(t('settings.auth.connectionStatus.connect'))
-					.setCta()
-					.onClick(async () => {
-						try {
-							await this.plugin.authenticate();
-							this.renderSettings();
-						} catch (error) {
-							new Notice(
-								t('settings.auth.connectionStatus.connectFailed', {
-									message:
-										error instanceof Error
-											? error.message
-											: t('settings.auth.connectionStatus.unknownError'),
-								})
+						.setCta()
+						.onClick(async () => {
+							try {
+								await this.plugin.authenticate();
+								this.renderSettings();
+							} catch (error) {
+								new Notice(
+									t('settings.auth.connectionStatus.connectFailed', {
+										message:
+											error instanceof Error
+												? error.message
+												: t('settings.auth.connectionStatus.unknownError'),
+									})
 							);
 						}
 					})
@@ -1283,11 +1280,13 @@ export class OneDriveSettingTab extends PluginSettingTab {
 			.setName(t('settings.sync.syncOnFileChange.name'))
 			.setDesc(t('settings.sync.syncOnFileChange.desc'))
 			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.syncOnFileChange ?? true).onChange(async (value) => {
-					this.plugin.settings.syncOnFileChange = value;
-					await this.plugin.saveSettings();
-					this.renderSettings();
-				})
+				toggle
+					.setValue(this.plugin.settings.syncOnFileChange ?? true)
+					.onChange(async (value) => {
+						this.plugin.settings.syncOnFileChange = value;
+						await this.plugin.saveSettings();
+						this.renderSettings();
+					})
 			);
 
 		// Delay before a file change triggers sync

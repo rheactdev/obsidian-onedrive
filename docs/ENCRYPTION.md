@@ -4,13 +4,13 @@ OneDrive Sync can encrypt file contents and filenames locally using Cryptomator 
 
 ## Create encrypted storage
 
-1. Connect the plugin to OneDrive and resolve any outstanding sync conflicts.
+1. Connect the plugin to a personal OneDrive account in **App Folder** mode and resolve any outstanding sync conflicts.
 2. Open **Settings → OneDrive Sync → End-to-end encryption → Set up encryption**.
 3. Select **Create new encrypted vault**, choose a new folder, and enter and confirm a password. The dialog displays the destination before creation. The default name is `<vault name>.cryptomator`.
 4. Leave **Remember on this device** enabled for automatic unlocking after restart, or disable it to enter your password each session.
 5. Choose **Start encrypted sync**. The plugin creates and verifies the vault before changing its active destination, then uploads eligible local files. Interrupted file uploads can be retried by syncing again.
 
-App Folder paths are relative to the OneDrive app folder. Full Access paths are relative to the drive root. For an existing shared-folder connection, paths are relative to that connection's selected folder.
+Paths are relative to the OneDrive app folder. Encrypted sync currently supports personal accounts in App Folder mode only. Full Access, shared folders, and work/school accounts remain available for plaintext sync but are outside the encrypted MVP.
 
 Existing plaintext files and OneDrive version history remain in their original location. Configure every device to use the encrypted destination; older clients pointed at a plaintext location will continue uploading plaintext there. Keep your password somewhere recoverable: a downloaded Cryptomator vault requires it even when this device remembers its unlock key.
 
@@ -18,7 +18,7 @@ If setup stops after creating the complete remote vault but before activating it
 
 ## Connect another device
 
-Install the plugin, connect to the same OneDrive account and access mode, and open encryption setup. Select **Connect existing encrypted vault**, enter the same remote folder and password, and start sync. The supported format is password-protected format 8 with `SIV_GCM`, a shortening threshold of 220, and the plugin's scrypt parameters. Older formats, Cryptomator Hub, and symlinks are not supported.
+Install the plugin, connect to the same personal OneDrive account in App Folder mode, and open encryption setup. Select **Connect existing encrypted vault**, enter the same remote folder and password, and start sync. The supported format is password-protected format 8 with `SIV_GCM`, a shortening threshold of 220, and the plugin's scrypt parameters. Older formats, Cryptomator Hub, and symlinks are not supported.
 
 Use **Change encrypted vault** to create or connect to another encrypted destination. The ordinary folder picker is fixed while encryption is active. The key and sync index are bound to the account, destination and vault identity. An account or destination mismatch stops encrypted sync rather than reusing the wrong key.
 
@@ -48,6 +48,6 @@ As with Cryptomator itself, cloud storage can still observe ciphertext sizes, fi
 
 ## Development verification
 
-Run `npm run test:interop` with Node, JDK 21 and Maven installed. It exports a complete raw vault from the TypeScript backend, then opens it using the official test-only `cryptofs` 2.8.0 reader and compares every recovered path and byte against the originals. Java is not bundled or required by the plugin. Set `MAVEN_BIN` to use a Maven executable outside `PATH`.
+The optional interoperability check is separate from the normal Java-free build, test suite, and CI. Run `npm run test:interop` with Node, JDK 21 and Maven installed. It exports a complete raw vault from the TypeScript backend, then opens it using the official test-only `cryptofs` 2.8.0 reader and compares every recovered path and byte against the originals. Java is not bundled or required by the plugin. Set `MAVEN_BIN` to use a Maven executable outside `PATH`.
 
 The regular test suite covers encryption, browser execution without Node globals, key isolation, cross-device sync, conflicts, long and Unicode names, folder moves/deletes, reset, reconcile and corruption. Live OneDrive and physical-device smoke tests require an authenticated Obsidian installation and are separate from these automated checks.

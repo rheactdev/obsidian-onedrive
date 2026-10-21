@@ -59,9 +59,9 @@ export class FileOperations {
 		return this.client.downloadFile(itemId);
 	}
 
-	async uploadExclusive(path: string, content: ArrayBuffer): Promise<OneDriveItem> {
+	async uploadCreateOnly(path: string, content: ArrayBuffer): Promise<OneDriveItem> {
 		await this.ensureParentFolder(path);
-		return this.chunkUploader.uploadExclusive(path, content);
+		return this.chunkUploader.uploadCreateOnly(path, content);
 	}
 
 	/**

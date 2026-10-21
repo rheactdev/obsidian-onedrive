@@ -56,6 +56,21 @@ describe('Cryptomator storage', () => {
 				expect(text(await raw.downloadFile(item.id))).not.toContain('my confidential note');
 		}
 	});
+	it('separates logical sizes and versions from raw Graph ciphertext metadata', async () => {
+		const { raw, storage } = await setup();
+		const data = bytes('private plaintext');
+		const logical = await storage.uploadFile('note.md', data);
+		const remote = Array.from(raw.items.values()).find((i) => i.id === logical.id)!;
+		expect(logical.name).toBe('note.md');
+		expect(logical.size).toBe(data.byteLength);
+		expect(logical.ciphertextSize).toBe(remote.size);
+		expect(logical.ciphertextSize).toBeGreaterThan(logical.size!);
+		expect(logical.contentVersion).toBe(remote.cTag);
+		expect(logical).not.toHaveProperty('cTag');
+		expect(logical).not.toHaveProperty('eTag');
+		expect(logical.file?.hashes).toBeUndefined();
+		expect(remote.file?.hashes?.quickXorHash).toBeTruthy();
+	});
 	it('syncs file changes, ID-only deletes, and expired-cursor full scans across devices', async () => {
 		const { storage, peer } = await setup();
 		const a = await storage.uploadFile('a.md', bytes('one')),

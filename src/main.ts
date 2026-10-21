@@ -33,7 +33,6 @@ import { OneDriveAuthProvider } from './auth/authProvider';
 // API
 import { OneDriveClient } from './api/oneDriveClient';
 import { FileOperations } from './api/fileOperations';
-import { RemoteStorage, PlaintextRemoteStorage } from './storage/remoteStorage';
 import { CryptomatorStorage } from './storage/cryptomatorStorage';
 import { CryptomatorCryptor, EncryptionError } from './crypto/cryptomator';
 import { EncryptionKeyStorage, encryptionScope } from './crypto/keyStorage';
@@ -101,7 +100,6 @@ export default class OneDriveSyncPlugin extends Plugin {
 	private authProvider?: OneDriveAuthProvider;
 	private oneDriveClient?: OneDriveClient;
 	private fileOps?: FileOperations;
-	private remoteStorage?: RemoteStorage;
 	private encryptedStorage?: CryptomatorStorage;
 	private encryptionChanging = false;
 	private componentGeneration = 0;
@@ -309,9 +307,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 				}, this.settings.startupSyncDelay * 1000);
 			}
 
-			logger.info(
-				'Authenticated initialization completed; event listeners and startup sync scheduled'
-			);
+			logger.info('Authenticated initialization completed; event listeners and startup sync scheduled');
 		} finally {
 			this.isInitializing = false;
 		}
@@ -341,20 +337,18 @@ export default class OneDriveSyncPlugin extends Plugin {
 		let openingCryptor: CryptomatorCryptor | undefined;
 		this.eventManager?.stopListening();
 		this.syncEngine = undefined;
-		this.remoteStorage = undefined;
 		logger.info(`Initializing authenticated components (mode: ${this.settings.accessMode})`);
 
 		if (!this.deviceCodeClient) {
 			// No usable authority for the configured identity — refreshing a token
 			// against the wrong one would fail with an opaque AADSTS error.
-			logger.error(
-				'Cannot initialize authenticated components: no auth client for the current settings'
-			);
+			logger.error('Cannot initialize authenticated components: no auth client for the current settings');
 			new Notice(t('notices.auth.clientInitFailed'));
 			return;
 		}
 
 		try {
+			if (this.settings.encryption) this.requireEncryptionSupported();
 			// Initialize auth provider
 			this.authProvider = new OneDriveAuthProvider(
 				this.tokenStorage,
@@ -368,8 +362,9 @@ export default class OneDriveSyncPlugin extends Plugin {
 
 			// Initialize OneDrive client with access mode
 			this.oneDriveClient = new OneDriveClient(this.authProvider, this.settings.accessMode);
-			this.fileOps = new FileOperations(this.oneDriveClient, () =>
-				this.getExperimentalSetting('skipFolderChecks')
+			this.fileOps = new FileOperations(
+				this.oneDriveClient,
+				() => this.getExperimentalSetting('skipFolderChecks')
 			);
 
 			// Configure shared drive if previously selected
@@ -446,15 +441,17 @@ export default class OneDriveSyncPlugin extends Plugin {
 			// remote drive down to the vault folder — not just the shared root.
 			// e.g. "/Documents/ObsidianVaults/JeffBrain" not just "/Documents"
 			let remoteRootOnDrive: string | undefined;
-			if (isShared) {
-				remoteRootOnDrive = this.getFullRemoteDrivePath();
-			} else if (isAppFolder) {
-				// Discover the actual app folder path — the name is set by Azure app
-				// registration and may differ from the hardcoded constant.
-				const appFolderPath = await this.oneDriveClient.resolveAppFolderPath();
-				// Include appFolderSubpath so delta paths get stripped correctly
-				remoteRootOnDrive = remoteRoot ? `${appFolderPath}/${remoteRoot}` : appFolderPath;
-			}
+				if (isShared) {
+					remoteRootOnDrive = this.getFullRemoteDrivePath();
+				} else if (isAppFolder) {
+					// Discover the actual app folder path — the name is set by Azure app
+					// registration and may differ from the hardcoded constant.
+					const appFolderPath = await this.oneDriveClient.resolveAppFolderPath();
+					// Include appFolderSubpath so delta paths get stripped correctly
+					remoteRootOnDrive = remoteRoot
+						? `${appFolderPath}/${remoteRoot}`
+						: appFolderPath;
+				}
 
 			if (generation !== this.componentGeneration) return;
 			if (this.settings.encryption) {
@@ -505,22 +502,18 @@ export default class OneDriveSyncPlugin extends Plugin {
 					scope,
 					config.cache
 				);
-				this.remoteStorage = this.encryptedStorage;
 				openingCryptor = undefined;
 				remoteRoot = '';
 				remoteRootOnDrive = '';
 			} else {
-				this.remoteStorage = new PlaintextRemoteStorage(
-					this.fileOps,
-					this.oneDriveClient,
-					remoteRoot
-				);
+				await this.checkPlaintextDestination(remoteRoot);
+				if (generation !== this.componentGeneration) return;
 			}
 
 			this.syncEngine = new SyncEngine(
 				this.app,
-				this.remoteStorage,
-				this.remoteStorage,
+				this.settings.encryption ? this.encryptedStorage! : this.fileOps,
+				this.settings.encryption ? this.encryptedStorage! : this.oneDriveClient,
 				this.syncStateManager,
 				this.conflictResolver,
 				this.eventManager,
@@ -562,7 +555,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 		} catch (error) {
 			openingCryptor?.destroy();
 			if (generation !== this.componentGeneration) return;
-			if (this.settings.encryption) {
+			if (this.settings.encryption || error instanceof EncryptionError) {
 				this.encryptedStorage?.close();
 				this.setSyncStatus(SyncStatus.LOCKED);
 				new Notice(error instanceof Error ? error.message : t('encryption.locked'));
@@ -651,10 +644,10 @@ export default class OneDriveSyncPlugin extends Plugin {
 		// skipped as already-uploaded. Clear them like disconnect() does.
 		if (!this.settings.encryption) {
 			this.settings.remoteDriveId = undefined;
-			this.settings.remoteItemId = undefined;
-			this.settings.remoteRootName = undefined;
-			this.settings.remoteRootPath = undefined;
-			this.settings.remoteRelativePathInShared = undefined;
+		this.settings.remoteItemId = undefined;
+		this.settings.remoteRootName = undefined;
+		this.settings.remoteRootPath = undefined;
+		this.settings.remoteRelativePathInShared = undefined;
 		}
 		this.syncStateManager.clearState();
 
@@ -791,10 +784,10 @@ export default class OneDriveSyncPlugin extends Plugin {
 		this.settings.connectedUser = undefined;
 		if (!this.settings.encryption) {
 			this.settings.remoteDriveId = undefined;
-			this.settings.remoteItemId = undefined;
-			this.settings.remoteRootName = undefined;
-			this.settings.remoteRootPath = undefined;
-			this.settings.remoteRelativePathInShared = undefined;
+		this.settings.remoteItemId = undefined;
+		this.settings.remoteRootName = undefined;
+		this.settings.remoteRootPath = undefined;
+		this.settings.remoteRelativePathInShared = undefined;
 		}
 
 		// Clear components
@@ -851,9 +844,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 		}
 
 		if (!this.syncEngine) {
-			new Notice(
-				t(this.isInitializing ? 'notices.sync.initializing' : 'notices.sync.engineNotInitialized')
-			);
+			new Notice(t(this.isInitializing ? 'notices.sync.initializing' : 'notices.sync.engineNotInitialized'));
 			return;
 		}
 
@@ -944,8 +935,8 @@ export default class OneDriveSyncPlugin extends Plugin {
 	 */
 	private updateStatusBar(): void {
 		if (!this.statusBarManager) return;
-		if (
-			this.settings.encryption &&
+
+		if (this.settings.encryption &&
 			(!this.syncEngine || this.settings.encryption.locked || this.encryptedStorage?.isLocked)
 		) {
 			this.setSyncStatus(SyncStatus.LOCKED);
@@ -1051,8 +1042,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 			this.settings.remoteDriveId = selection.driveId;
 			this.settings.remoteItemId = selection.itemId;
 			this.settings.remoteRootName = selection.name;
-			this.settings.remoteRelativePathInShared =
-				selection.relativePathInShared?.replace(/^\/+|\/+$/g, '') || '';
+			this.settings.remoteRelativePathInShared = selection.relativePathInShared?.replace(/^\/+|\/+$/g, '') || '';
 
 			// Resolve the actual path on the remote drive for delta path stripping
 			if (this.oneDriveClient) {
@@ -1319,7 +1309,11 @@ export default class OneDriveSyncPlugin extends Plugin {
 	 */
 	async loadSettings() {
 		const loaded = ((await this.loadData()) as Partial<PluginSettings>) ?? {};
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			loaded
+		);
 
 		this.normalizeIdentitySettings();
 
@@ -1475,13 +1469,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 			return;
 		}
 		if (!this.syncEngine) {
-			new Notice(
-				t(
-					this.isInitializing
-						? 'notices.sync.initializing'
-						: 'notices.reconcile.engineNotInitialized'
-				)
-			);
+			new Notice(t(this.isInitializing ? 'notices.sync.initializing' : 'notices.reconcile.engineNotInitialized'));
 			return;
 		}
 		if (this.isSyncing || this.eventManager?.isSyncInProgress()) {
@@ -1529,13 +1517,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 			return;
 		}
 		if (!this.syncEngine) {
-			new Notice(
-				t(
-					this.isInitializing
-						? 'notices.sync.initializing'
-						: 'notices.reconcileToCloud.engineNotInitialized'
-				)
-			);
+			new Notice(t(this.isInitializing ? 'notices.sync.initializing' : 'notices.reconcileToCloud.engineNotInitialized'));
 			return;
 		}
 		if (this.isSyncing || this.eventManager?.isSyncInProgress()) {
@@ -1573,8 +1555,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 
 		// Prepare sync state for save
 		this.settings.syncState = this.syncStateManager.prepareForSave();
-		if (
-			this.settings.encryption &&
+		if (this.settings.encryption &&
 			this.encryptedStorage?.scope === this.settings.encryption.scope
 		) {
 			this.settings.encryption.cache = this.encryptedStorage.prepareForSave(
@@ -1615,6 +1596,24 @@ export default class OneDriveSyncPlugin extends Plugin {
 		return (this.settings.fileChangeSyncDelay ?? DEFAULT_SETTINGS.fileChangeSyncDelay) * 1000;
 	}
 
+	isEncryptionSupported(): boolean {
+		return this.settings.accountType === 'personal' &&
+			this.settings.accessMode === OneDriveAccessMode.APP_FOLDER &&
+			!this.settings.remoteDriveId && !this.settings.remoteItemId &&
+			!this.oneDriveClient?.isSharedDrive();
+	}
+
+	private requireEncryptionSupported(): void {
+		if (!this.isEncryptionSupported()) throw new EncryptionError(t('encryption.personalAppFolderOnly'));
+	}
+
+	/** Check once when activating a destination, not before each plaintext operation. */
+	private async checkPlaintextDestination(root: string): Promise<void> {
+		if (await this.fileOps!.fileExists([root, 'vault.cryptomator'].filter(Boolean).join('/'))) {
+			throw new EncryptionError(t('encryption.destinationEncrypted'));
+		}
+	}
+
 	private async getEncryptionScope(
 		folder: string,
 		vaultId: string,
@@ -1636,17 +1635,11 @@ export default class OneDriveSyncPlugin extends Plugin {
 	}
 
 	getEncryptionDefaultFolder(): string {
-		const selected =
-			(this.settings.accessMode === OneDriveAccessMode.APP_FOLDER
-				? this.settings.appFolderSubpath
-				: this.settings.remotePath) || '';
-		const parent = this.oneDriveClient?.isSharedDrive()
-			? ''
-			: selected
-					.replace(/^\/+|\/+$/g, '')
-					.split('/')
-					.slice(0, -1)
-					.join('/');
+		const parent = (this.settings.appFolderSubpath || '')
+			.replace(/^\/+|\/+$/g, '')
+			.split('/')
+			.slice(0, -1)
+			.join('/');
 		const name = this.app.vault
 			.getName()
 			.replace(/["*:<>?\\/|]/g, '_')
@@ -1655,15 +1648,14 @@ export default class OneDriveSyncPlugin extends Plugin {
 	}
 
 	getEncryptionDestination(folder: string): string {
-		const base = this.oneDriveClient?.isSharedDrive()
-			? this.getFullRemoteDrivePath()
-			: this.settings.accessMode === OneDriveAccessMode.APP_FOLDER
-				? t('encryption.appFolder')
-				: '';
-		return `${base}/${folder.replace(/^\/+/, '')}`;
+		return `${t('encryption.appFolder')}/${folder.replace(/^\/+/, '')}`;
 	}
 
 	showEncryptionSetup(onClose?: () => void): void {
+		if (!this.isEncryptionSupported()) {
+			new Notice(t('encryption.personalAppFolderOnly'));
+			return;
+		}
 		new EncryptionModal(this.app, {
 			onClose,
 			folder: this.settings.encryption?.folder || this.getEncryptionDefaultFolder(),
@@ -1689,6 +1681,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 		remember: boolean,
 		create: boolean
 	): Promise<void> {
+		this.requireEncryptionSupported();
 		this.requireEncryptionIdle();
 		if (!this.oneDriveClient || !this.fileOps) throw new Error(t('encryption.connectFirst'));
 		if (this.conflictQueue?.count) throw new Error(t('encryption.resolveConflicts'));
@@ -1787,6 +1780,10 @@ export default class OneDriveSyncPlugin extends Plugin {
 	}
 
 	showEncryptionUnlock(onClose?: () => void): void {
+		if (!this.isEncryptionSupported()) {
+			new Notice(t('encryption.personalAppFolderOnly'));
+			return;
+		}
 		const config = this.settings.encryption;
 		if (!config) return;
 		new EncryptionModal(this.app, {
@@ -1796,6 +1793,7 @@ export default class OneDriveSyncPlugin extends Plugin {
 			remember: config.rememberKey,
 			destination: (folder) => this.getEncryptionDestination(folder),
 			submit: async (_folder, password, remember) => {
+				this.requireEncryptionSupported();
 				this.requireEncryptionIdle();
 				if (config !== this.settings.encryption) throw new Error(t('encryption.connectionChanged'));
 				if (!this.fileOps || !this.oneDriveClient) throw new Error(t('encryption.connectFirst'));

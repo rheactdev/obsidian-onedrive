@@ -2,11 +2,12 @@ import { FileOperations } from '../api/fileOperations';
 import { OneDriveClient } from '../api/oneDriveClient';
 import { DeltaResponse, OneDriveItem } from '../types';
 import { CryptomatorCryptor, EncryptionError, buffer } from '../crypto/cryptomator';
-import { RemoteStorage } from './remoteStorage';
+import type { RemoteStorage } from './remoteStorage';
+import type { EncryptedOneDriveItem, EncryptedStorageState, VersionedOneDriveItem } from '../crypto/types';
 
 const encode = (value: string) => buffer(new TextEncoder().encode(value));
 const decode = (value: ArrayBuffer) => new TextDecoder('utf-8', { fatal: true }).decode(value);
-const version = (item: OneDriveItem) =>
+const version = (item: VersionedOneDriveItem) =>
 	item.cTag ||
 	item.file?.hashes?.quickXorHash ||
 	item.eTag ||
@@ -23,7 +24,7 @@ function pathOf(path: string): string {
 	return clean.normalize('NFC');
 }
 interface Node {
-	entry: OneDriveItem;
+	entry: EncryptedOneDriveItem;
 	storage: string;
 	wrapper?: string;
 	dirId?: string;
@@ -33,24 +34,16 @@ interface Control {
 	version: string;
 	text: string;
 }
-export interface EncryptedStorageState {
-	version: 1;
-	scope: string;
-	cursor: string;
-	items: OneDriveItem[];
-	controls: Array<[string, Control]>;
-	entries: OneDriveItem[];
-}
 
 /** A standard Cryptomator filesystem over the existing Graph transport.
  * All indexes are device-local and disposable. The remote vault is self-contained. */
 export class CryptomatorStorage implements RemoteStorage {
 	readonly encrypted = true;
-	private rawItems = new Map<string, OneDriveItem>();
-	private paths = new Map<string, OneDriveItem>();
+	private rawItems = new Map<string, VersionedOneDriveItem>();
+	private paths = new Map<string, VersionedOneDriveItem>();
 	private controls = new Map<string, Control>();
 	private nodes = new Map<string, Node>();
-	private previous: OneDriveItem[] = [];
+	private previous: EncryptedOneDriveItem[] = [];
 	private cursor?: string;
 	private pendingCursor?: string;
 	private committed?: EncryptedStorageState;
@@ -124,15 +117,15 @@ export class CryptomatorStorage implements RemoteStorage {
 		const created = await CryptomatorCryptor.create(password);
 		try {
 			await raw.createFolder(root);
-			await raw.uploadExclusive(`${root}/masterkey.cryptomator`, encode(created.masterkey));
+			await raw.uploadCreateOnly(`${root}/masterkey.cryptomator`, encode(created.masterkey));
 			const rootDir = await created.cryptor.directoryPath('');
 			await raw.createFolder(`${root}/${rootDir}`);
-			await raw.uploadExclusive(
+			await raw.uploadCreateOnly(
 				`${root}/${rootDir}/dirid.c9r`,
 				await created.cryptor.encrypt(encode(''))
 			);
 			// Publish the signed configuration last, after all required root metadata exists.
-			await raw.uploadExclusive(`${root}/vault.cryptomator`, encode(created.config));
+			await raw.uploadCreateOnly(`${root}/vault.cryptomator`, encode(created.config));
 			const verified = await CryptomatorCryptor.unlock(
 				decode(await raw.downloadFileByPath(`${root}/vault.cryptomator`)),
 				decode(await raw.downloadFileByPath(`${root}/masterkey.cryptomator`)),
@@ -168,11 +161,7 @@ export class CryptomatorStorage implements RemoteStorage {
 		if (subPath) throw new EncryptionError('Encrypted storage has one logical change stream.');
 		const rootItem = await this.raw.getFileMetadata(this.root);
 		const useCache = !!cursor && cursor === this.cursor && this.rawItems.size > 0;
-		const response = await this.client.getDelta(
-			useCache ? cursor : undefined,
-			this.client.isSharedDrive() ? undefined : this.root,
-			this.client.isSharedDrive() ? this.root : undefined
-		);
+		const response = await this.client.getDelta(useCache ? cursor : undefined, this.root);
 		if (!useCache || response.reset) this.rawItems.clear();
 		this.rawItems.set(rootItem.id, rootItem);
 		// Last entry for an ID wins; delta ordering is not a filesystem traversal order.
@@ -278,7 +267,7 @@ export class CryptomatorStorage implements RemoteStorage {
 		const visit = async (
 			logical: string,
 			dirId: string,
-			entry: OneDriveItem,
+			entry: EncryptedOneDriveItem,
 			wrapper?: string
 		): Promise<void> => {
 			if (seen.has(dirId)) throw new EncryptionError('Duplicate or cyclic encrypted directory ID.');
@@ -322,27 +311,28 @@ export class CryptomatorStorage implements RemoteStorage {
 				}
 			}
 		};
-		await visit('', '', {
+		await visit('', '', this.logical({
 			id: 'cryptomator-root',
 			name: '',
 			folder: { childCount: 0 },
 			createdDateTime: '',
 			lastModifiedDateTime: '',
-		});
+		}, '', true));
 		this.nodes = next;
 	}
-	private logical(item: OneDriveItem, path: string, folder: boolean): OneDriveItem {
+	private logical(item: VersionedOneDriveItem, path: string, folder: boolean): EncryptedOneDriveItem {
 		return {
-			...item,
+			id: item.id,
+			createdDateTime: item.createdDateTime,
+			lastModifiedDateTime: item.lastModifiedDateTime,
 			name: path.split('/').pop()!,
 			__resolvedVaultPath: path,
-			parentReference: undefined,
 			folder: folder ? { childCount: 0 } : undefined,
 			file: folder
 				? undefined
-				: { mimeType: 'application/octet-stream', hashes: { quickXorHash: version(item) } },
+				: { mimeType: 'application/octet-stream' },
 			size: folder ? 0 : CryptomatorCryptor.plaintextSize(item.size || 0),
-			ciphertextSize: item.size,
+			ciphertextSize: item.size || 0,
 			contentVersion: version(item),
 		};
 	}
@@ -350,7 +340,7 @@ export class CryptomatorStorage implements RemoteStorage {
 		this.check();
 		if (!this.loaded) await this.getDelta(this.cursor);
 	}
-	async listAllItems(): Promise<OneDriveItem[]> {
+	async listAllItems(): Promise<EncryptedOneDriveItem[]> {
 		await this.getDelta();
 		return Array.from(this.nodes.values(), (n) => n.entry).filter((i) => !!i.__resolvedVaultPath);
 	}
@@ -369,7 +359,7 @@ export class CryptomatorStorage implements RemoteStorage {
 		}
 	}
 	private async exclusive(path: string, value: ArrayBuffer): Promise<OneDriveItem> {
-		const item = await this.raw.uploadExclusive(this.remote(path), value);
+		const item = await this.raw.uploadCreateOnly(this.remote(path), value);
 		this.remember(item, path);
 		return item;
 	}
@@ -457,7 +447,7 @@ export class CryptomatorStorage implements RemoteStorage {
 		this.nodes.set(path, node);
 		return node;
 	}
-	async createFolder(path: string): Promise<OneDriveItem> {
+	async createFolder(path: string): Promise<EncryptedOneDriveItem> {
 		await this.ready();
 		return (await this.ensureDirectory(pathOf(path))).entry;
 	}
@@ -465,7 +455,7 @@ export class CryptomatorStorage implements RemoteStorage {
 		path: string,
 		bytes: ArrayBuffer,
 		progress?: (uploaded: number, total: number) => void
-	): Promise<OneDriveItem> {
+	): Promise<EncryptedOneDriveItem> {
 		await this.ready();
 		path = pathOf(path);
 		if (!path || this.nodes.get(path)?.dirId !== undefined)
@@ -493,7 +483,7 @@ export class CryptomatorStorage implements RemoteStorage {
 	async downloadFileByPath(path: string): Promise<ArrayBuffer> {
 		return this.downloadFile((await this.getFileMetadata(path)).id);
 	}
-	async getFileMetadata(path: string): Promise<OneDriveItem> {
+	async getFileMetadata(path: string): Promise<EncryptedOneDriveItem> {
 		await this.ready();
 		const node = this.nodes.get(pathOf(path));
 		if (!node) throw new Error('Encrypted file not found.');

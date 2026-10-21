@@ -33,7 +33,10 @@ describe('Chunk Upload', () => {
 			const targetSize = Math.floor(fileSize / SYNC_CONFIG.TARGET_CHUNKS_PER_FILE);
 			const aligned =
 				Math.ceil(targetSize / SYNC_CONFIG.MIN_CHUNK_SIZE) * SYNC_CONFIG.MIN_CHUNK_SIZE;
-			return Math.min(Math.max(aligned, SYNC_CONFIG.MIN_CHUNK_SIZE), SYNC_CONFIG.MAX_CHUNK_SIZE);
+			return Math.min(
+				Math.max(aligned, SYNC_CONFIG.MIN_CHUNK_SIZE),
+				SYNC_CONFIG.MAX_CHUNK_SIZE
+			);
 		};
 
 		it('should use minimum chunk size for very small files', () => {
@@ -129,7 +132,7 @@ describe('Chunk Upload', () => {
 					status: 201,
 					json: { id: 'marker', name: 'dir.c9r' },
 				} as never);
-				await uploader.uploadExclusive(
+				await uploader.uploadCreateOnly(
 					'encrypted/dir.c9r',
 					new TextEncoder().encode('directory-id').buffer
 				);
@@ -162,7 +165,9 @@ describe('Chunk Upload', () => {
 					json: { error: 'Server error' },
 				} as never);
 
-				await expect(uploader.uploadFile('test.txt', smallContent)).rejects.toThrow(OneDriveError);
+				await expect(uploader.uploadFile('test.txt', smallContent)).rejects.toThrow(
+					OneDriveError
+				);
 			});
 
 			it('should call progress callback for large files', async () => {
@@ -198,6 +203,9 @@ describe('Chunk Upload', () => {
 				const result = await uploader.uploadFile('large.bin', largeContent, onProgress);
 
 				expect(result).toEqual({ id: 'file-123', name: 'large.bin' });
+				expect(mockClient.getClient().api().post).toHaveBeenCalledWith({
+					item: { '@microsoft.graph.conflictBehavior': 'replace' },
+				});
 				expect(onProgress).toHaveBeenCalled();
 			});
 
@@ -211,7 +219,9 @@ describe('Chunk Upload', () => {
 					}),
 				});
 
-				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(OneDriveError);
+				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
+					OneDriveError
+				);
 				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
 					'Failed to create upload session'
 				);
@@ -235,7 +245,9 @@ describe('Chunk Upload', () => {
 					json: { error: 'Server error' },
 				} as never);
 
-				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(OneDriveError);
+				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
+					OneDriveError
+				);
 				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
 					'Failed to upload chunk'
 				);
@@ -256,7 +268,9 @@ describe('Chunk Upload', () => {
 				// Mock chunk upload to throw
 				vi.mocked(requestUrl).mockRejectedValue(new Error('Connection reset'));
 
-				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(OneDriveError);
+				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
+					OneDriveError
+				);
 				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
 					'Failed to upload chunk'
 				);
@@ -341,7 +355,9 @@ describe('Chunk Upload', () => {
 					return { status: 200, json: {} } as never;
 				});
 
-				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(OneDriveError);
+				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
+					OneDriveError
+				);
 				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
 					'Failed to get final item'
 				);
@@ -370,7 +386,9 @@ describe('Chunk Upload', () => {
 					return { status: 200, json: {} } as never;
 				});
 
-				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(OneDriveError);
+				await expect(uploader.uploadFile('large.bin', largeContent)).rejects.toThrow(
+					OneDriveError
+				);
 			});
 
 			it('resumes a chunked upload via nextExpectedRanges after a chunk fails', async () => {
@@ -411,7 +429,9 @@ describe('Chunk Upload', () => {
 
 				expect(result).toEqual({ id: 'resumed-123', name: 'large.bin' });
 				// A GET to the session was made to discover the resume offset
-				expect(vi.mocked(requestUrl).mock.calls.some((c) => c[0].method === 'GET')).toBe(true);
+				expect(
+					vi.mocked(requestUrl).mock.calls.some((c) => c[0].method === 'GET')
+				).toBe(true);
 			});
 
 			it('rethrows the chunk error when the session cannot report a resume offset', async () => {

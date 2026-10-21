@@ -2,6 +2,8 @@ import type { LocaleStrings } from './en';
 
 export const zhCn = {
 	encryption: {
+		personalAppFolderOnly: '加密同步目前仅支持个人 OneDrive 账户的应用文件夹模式。请选择个人账户和应用文件夹后继续。',
+		destinationEncrypted: '此位置是 Cryptomator 保险库。请先在端到端加密设置中连接它，再进行同步。',
 		heading: '端到端加密',
 		description:
 			'上传前加密文件内容和名称。下载整个远程文件夹后，可使用保险库密码在 Cryptomator 中打开。本地 Obsidian 文件仍可正常读取。',
@@ -92,12 +94,10 @@ export const zhCn = {
 			connectSuccess: '已连接到 OneDrive',
 			connectFailed: '连接 OneDrive 失败：{{message}}',
 			disconnectSuccess: '已断开 OneDrive 连接',
-			customClientIdRequired:
-				'工作或学校账户需要自定义客户端 ID。请参阅设置文档以注册您自己的应用程序。',
+			customClientIdRequired: '工作或学校账户需要自定义客户端 ID。请参阅设置文档以注册您自己的应用程序。',
 			tenantIdRequired: '租户账户类型需要租户 ID。',
 			reconnectRequiredIdentityChanged: '账户设置已更改，请重新连接 OneDrive。',
-			accessModeSwitchedToFullAccess:
-				'工作或学校账户不支持应用文件夹模式，访问模式已切换为完全访问。',
+			accessModeSwitchedToFullAccess: '工作或学校账户不支持应用文件夹模式，访问模式已切换为完全访问。',
 			entra: {
 				conditionalAccessBlocked: '您组织的策略阻止了此登录方式。请联系管理员，或尝试其他设备。',
 				appNotAuthorized: '该应用程序尚未在您的组织中获得批准。请让管理员批准该应用注册。',
@@ -129,8 +129,7 @@ export const zhCn = {
 				'OneDrive 同步：已同步 {{syncedCount}} {{fileLabel}}，{{conflictCount}} {{conflictLabel}}需要处理',
 			completedWithDeferred:
 				'OneDrive sync: {{syncedCount}} {{fileLabel}} synced; {{retryCount}} {{retryLabel}} will retry automatically ({{lockedCount}} locked/deferred)',
-			folderChangesFailed:
-				'OneDrive 同步：有 {{count}} 个文件夹变更未能应用到 OneDrive。请启用调试日志查看详情。',
+			folderChangesFailed: 'OneDrive 同步：有 {{count}} 个文件夹变更未能应用到 OneDrive。请启用调试日志查看详情。',
 			engineFailed: 'OneDrive 同步失败：{{message}}',
 		},
 		reconcile: {

@@ -74,8 +74,8 @@ export class ChunkUploader {
 		return this.uploadLargeFile(filePath, content, onProgress);
 	}
 
-	/** Metadata must be created atomically, including when it fits in a single chunk. */
-	async uploadExclusive(filePath: string, content: ArrayBuffer): Promise<OneDriveItem> {
+	/** Create Cryptomator metadata without overwriting another device's directory ID or vault keys. */
+	async uploadCreateOnly(filePath: string, content: ArrayBuffer): Promise<OneDriveItem> {
 		return this.uploadLargeFile(filePath, content, undefined, 'fail');
 	}
 
@@ -116,11 +116,9 @@ export class ChunkUploader {
 			});
 		} catch (error) {
 			logger.error('Failed to upload small file:', error);
-			throw error instanceof OneDriveError
-				? error
-				: new OneDriveError(
-						`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`
-					);
+			throw error instanceof OneDriveError ? error : new OneDriveError(
+				`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
 		}
 	}
 
@@ -210,13 +208,12 @@ export class ChunkUploader {
 			const graphClient = this.client.getClient();
 			const apiPath = this.client.buildEndpoint(filePath, 'createUploadSession');
 
-			return await retryWithBackoff<OneDriveUploadSession>(
-				() =>
-					graphClient.api(apiPath).post({
-						item: {
-							'@microsoft.graph.conflictBehavior': conflictBehavior,
-						},
-					}) as Promise<OneDriveUploadSession>
+			return await retryWithBackoff<OneDriveUploadSession>(() =>
+				graphClient.api(apiPath).post({
+					item: {
+						'@microsoft.graph.conflictBehavior': conflictBehavior,
+					},
+				}) as Promise<OneDriveUploadSession>
 			);
 		} catch (error) {
 			logger.error('Failed to create upload session:', error);

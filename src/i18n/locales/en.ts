@@ -1,5 +1,7 @@
 export const en = {
 	encryption: {
+		personalAppFolderOnly: 'Encrypted sync currently supports personal OneDrive accounts in App Folder mode only. Select a personal account and App Folder to continue.',
+		destinationEncrypted: 'This destination is a Cryptomator vault. Connect it in End-to-end encryption settings before syncing.',
 		heading: 'End-to-end encryption',
 		description:
 			'Encrypt file contents and names before upload. The remote folder can be opened in Cryptomator with your vault password. Local Obsidian files remain readable.',
@@ -133,8 +135,7 @@ export const en = {
 				'OneDrive sync: {{syncedCount}} {{fileLabel}} synced, {{conflictCount}} {{conflictLabel}} need resolution',
 			completedWithDeferred:
 				'OneDrive sync: {{syncedCount}} {{fileLabel}} synced; {{retryCount}} {{retryLabel}} will retry automatically ({{lockedCount}} locked/deferred)',
-			folderChangesFailed:
-				"OneDrive sync: {{count}} folder change(s) couldn't be applied on OneDrive. Enable debug logging for details.",
+			folderChangesFailed: 'OneDrive sync: {{count}} folder change(s) couldn\'t be applied on OneDrive. Enable debug logging for details.',
 			engineFailed: 'OneDrive sync failed: {{message}}',
 		},
 		reconcile: {
@@ -250,7 +251,7 @@ export const en = {
 				workSchool: 'Work or school (any organization)',
 				tenant: 'Work or school (specific organization)',
 				tenantIdName: 'Tenant ID',
-				tenantIdDesc: 'The Entra ID tenant (directory) ID to sign in against.',
+				tenantIdDesc: "The Entra ID tenant (directory) ID to sign in against.",
 				tenantIdPlaceholder: 'e.g. 11111111-1111-1111-1111-111111111111',
 				appFolderUnavailable: 'App Folder mode is unavailable for work and school accounts.',
 				reconnectRequired: ' Changing this requires reconnecting.',
@@ -342,7 +343,7 @@ export const en = {
 			},
 			pluginData: {
 				name: 'Sync plugin data',
-				desc: "Also sync each plugin's data.json settings file. OneDrive Sync's own data remains device-local. Warning: plugin data can be device-specific and may cause conflicts; enable only if you understand the plugin's sync behaviour.",
+				desc: 'Also sync each plugin\'s data.json settings file. OneDrive Sync\'s own data remains device-local. Warning: plugin data can be device-specific and may cause conflicts; enable only if you understand the plugin\'s sync behaviour.',
 			},
 			cssSnippets: {
 				name: 'Sync CSS snippets',
@@ -417,26 +418,25 @@ export const en = {
 			},
 		},
 		experimental: {
-			heading: 'Experimental',
-			description:
-				'These settings may improve performance but are not fully tested. Use at your own risk.',
-			skipFolderChecks: {
-				name: 'Skip folder existence checks',
-				desc: 'Skip API calls to verify folders exist before uploading. OneDrive auto-creates parent folders, so this is usually safe and faster.',
-			},
-			maxConcurrentOperations: {
-				name: 'Max concurrent operations',
-				desc: 'Maximum number of parallel upload/download operations. Higher values may speed up large syncs but could hit rate limits.',
-				placeholder: '4',
-			},
-			useAtomicMoves: {
-				name: 'Use atomic moves',
-				desc: "Use OneDrive's native move API for file renames/moves instead of delete + re-upload. More efficient and avoids duplicate files if sync state is lost.",
-			},
-			pullOnlyMode: {
-				name: 'Pull-only mode (read-only sync)',
-				desc: 'Only download remote changes from OneDrive. Local edits will not be uploaded. Useful for read-only vaults or backup recovery. When disabled, local changes will sync on the next cycle.',
-			},
+				heading: 'Experimental',
+				description: 'These settings may improve performance but are not fully tested. Use at your own risk.',
+				skipFolderChecks: {
+					name: 'Skip folder existence checks',
+					desc: 'Skip API calls to verify folders exist before uploading. OneDrive auto-creates parent folders, so this is usually safe and faster.',
+				},
+					maxConcurrentOperations: {
+						name: 'Max concurrent operations',
+						desc: 'Maximum number of parallel upload/download operations. Higher values may speed up large syncs but could hit rate limits.',
+						placeholder: '4',
+					},
+					useAtomicMoves: {
+						name: 'Use atomic moves',
+						desc: 'Use OneDrive\'s native move API for file renames/moves instead of delete + re-upload. More efficient and avoids duplicate files if sync state is lost.',
+					},
+					pullOnlyMode: {
+						name: 'Pull-only mode (read-only sync)',
+						desc: 'Only download remote changes from OneDrive. Local edits will not be uploaded. Useful for read-only vaults or backup recovery. When disabled, local changes will sync on the next cycle.',
+					},
 		},
 	},
 } as const;

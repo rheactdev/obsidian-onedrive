@@ -1,10 +1,11 @@
 import { OneDriveItem, DeltaResponse } from '../../src/types';
+import type { VersionedOneDriveItem } from '../../src/crypto/types';
 import { FileOperations } from '../../src/api/fileOperations';
 import { OneDriveClient } from '../../src/api/oneDriveClient';
 
 /** Graph-shaped filesystem with stable IDs, parent references, tombstones and atomic creates. */
 export class MemoryRemote {
-	items = new Map<string, OneDriveItem>();
+	items = new Map<string, VersionedOneDriveItem>();
 	bytes = new Map<string, ArrayBuffer>();
 	deleted: OneDriveItem[] = [];
 	counter = 0;
@@ -16,7 +17,7 @@ export class MemoryRemote {
 	private clean(path: string): string {
 		return path.replace(/^\/+|\/+$/g, '');
 	}
-	private item(path: string, folder: boolean, id?: string): OneDriveItem {
+	private item(path: string, folder: boolean, id?: string): VersionedOneDriveItem {
 		const n = ++this.counter,
 			time = new Date(1700000000000 + n * 1000).toISOString();
 		return {
@@ -69,7 +70,7 @@ export class MemoryRemote {
 		this.bytes.set(next.id, content.slice(0));
 		return structuredClone(next);
 	}
-	async uploadExclusive(path: string, content: ArrayBuffer): Promise<OneDriveItem> {
+	async uploadCreateOnly(path: string, content: ArrayBuffer): Promise<OneDriveItem> {
 		path = this.clean(path);
 		await this.createFolder(path.split('/').slice(0, -1).join('/'));
 		// This check and publication run without an intervening await, like Graph conflictBehavior=fail.

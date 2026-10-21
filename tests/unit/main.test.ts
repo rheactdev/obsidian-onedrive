@@ -110,7 +110,7 @@ const mocks = vi.hoisted(() => {
 			return oneDriveClient;
 		}),
 		FileOperations: vi.fn().mockImplementation(function () {
-			return {};
+			return { fileExists: vi.fn().mockResolvedValue(false) };
 		}),
 		SyncEngine: vi.fn().mockImplementation(function () {
 			return syncEngine;
@@ -198,11 +198,7 @@ vi.mock('../../src/ui/statusBar', () => ({
 	StatusBarManager: mocks.StatusBarManager,
 	SyncStatus: {
 		LOCKED: 'locked',
-		IDLE: 'idle',
-		SYNCING: 'syncing',
-		ERROR: 'error',
-		DISCONNECTED: 'disconnected',
-	},
+		IDLE: 'idle', SYNCING: 'syncing', ERROR: 'error', DISCONNECTED: 'disconnected' },
 }));
 
 vi.mock('../../src/ui/authModal', () => ({
@@ -538,6 +534,7 @@ describe('OneDriveSyncPlugin', () => {
 		});
 
 		await plugin.onload();
+		await vi.waitFor(() => expect(mocks.SyncEngine).toHaveBeenCalled());
 		await plugin.triggerManualSync();
 
 		expect(mocks.eventManager.triggerManualSync).toHaveBeenCalledTimes(1);
@@ -792,6 +789,7 @@ describe('OneDriveSyncPlugin', () => {
 		});
 
 		await plugin.onload();
+		await vi.waitFor(() => expect(mocks.SyncEngine).toHaveBeenCalled());
 		await plugin.triggerManualSync();
 
 		// SyncEngine constructor: arg 7 is the options object containing remoteRoot and remoteRootOnDrive
@@ -811,6 +809,7 @@ describe('OneDriveSyncPlugin', () => {
 		});
 
 		await plugin.onload();
+		await vi.waitFor(() => expect(mocks.SyncEngine).toHaveBeenCalled());
 		await plugin.triggerManualSync();
 
 		const syncEngineCall = mocks.SyncEngine.mock.calls[0];
@@ -850,12 +849,12 @@ describe('OneDriveSyncPlugin', () => {
 		// as a post-construction setter that is easy to forget.
 		// The 5th constructor argument (index 4) is syncOnFileChange.
 		expect(mocks.EventManager).toHaveBeenCalledWith(
-			expect.anything(), // app
-			expect.any(Function), // onSyncTriggered
-			expect.anything(), // stateManager
-			expect.any(Function), // shouldSyncPath
-			false, // syncOnFileChange — persisted value
-			3000 // fileChangeSyncDelayMs — default
+			expect.anything(),       // app
+			expect.any(Function),    // onSyncTriggered
+			expect.anything(),       // stateManager
+			expect.any(Function),    // shouldSyncPath
+			false,                   // syncOnFileChange — persisted value
+			3000                     // fileChangeSyncDelayMs — default
 		);
 	});
 
@@ -944,8 +943,65 @@ describe('OneDriveSyncPlugin', () => {
 				return mocks.oneDriveClient;
 			});
 			mocks.FileOperations.mockImplementation(function () {
-				return {};
+				return { fileExists: vi.fn().mockResolvedValue(false) };
 			});
+		});
+		it.each([
+			{ accountType: 'personal', accessMode: OneDriveAccessMode.FULL_ACCESS },
+			{ accountType: 'work-school', accessMode: OneDriveAccessMode.FULL_ACCESS },
+			{ accountType: 'tenant', accessMode: OneDriveAccessMode.FULL_ACCESS },
+			{ accountType: 'personal', accessMode: OneDriveAccessMode.APP_FOLDER, remoteDriveId: 'shared', remoteItemId: 'root' },
+		])('rejects encrypted creation and connection for unsupported destinations: %j', async (settings) => {
+			Object.assign(plugin.settings, settings);
+			const create = vi.spyOn(CryptomatorStorage, 'create');
+			const raw = (plugin as any).fileOps;
+			const read = vi.spyOn(raw, 'downloadFileByPath');
+			try {
+				for (const creating of [true, false])
+					await expect(plugin.configureEncryptedSync('encrypted', 'password', true, creating))
+						.rejects.toThrow('App Folder');
+				expect(create).not.toHaveBeenCalled();
+				expect(read).not.toHaveBeenCalled();
+				expect(plugin.settings.encryption).toBeUndefined();
+			} finally {
+				create.mockRestore();
+				read.mockRestore();
+			}
+		});
+		it('uses original plaintext transports and checks the destination only during initialization', async () => {
+			plugin.settings.appFolderSubpath = 'plain';
+			const files = (plugin as any).fileOps;
+			const exists = vi.spyOn(files, 'fileExists');
+			await (plugin as any).initializeAuthenticatedComponents();
+			const call = mocks.SyncEngine.mock.calls.at(-1);
+			expect(call[1]).toBe(files);
+			expect(call[2]).toBe((plugin as any).oneDriveClient);
+			expect(exists).toHaveBeenCalledExactlyOnceWith('plain/vault.cryptomator');
+			await files.uploadFile('plain/note.md', new TextEncoder().encode('plain').buffer);
+			await files.downloadFileByPath('plain/note.md');
+			expect(exists).toHaveBeenCalledTimes(1);
+		});
+		it('blocks plaintext initialization when its destination is an encrypted vault', async () => {
+			plugin.settings.appFolderSubpath = 'encrypted';
+			await (plugin as any).fileOps.uploadFile('encrypted/vault.cryptomator', new ArrayBuffer(0));
+			mocks.SyncEngine.mockClear();
+			await (plugin as any).initializeAuthenticatedComponents();
+			expect(mocks.SyncEngine).not.toHaveBeenCalled();
+			expect(plugin.getSyncStatusInfo().status).toBe('locked');
+		});
+		it('pauses an existing encrypted vault after switching to an unsupported mode without reading a key', async () => {
+			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
+			const readKey = vi.spyOn((plugin as any).app.secretStorage, 'getSecret');
+			const close = vi.spyOn((plugin as any).encryptedStorage, 'close');
+			plugin.settings.accessMode = OneDriveAccessMode.FULL_ACCESS;
+			mocks.SyncEngine.mockClear();
+			await (plugin as any).initializeAuthenticatedComponents();
+			expect(mocks.SyncEngine).not.toHaveBeenCalled();
+			expect(readKey).not.toHaveBeenCalled();
+			expect(close).toHaveBeenCalled();
+			expect(plugin.getSyncStatusInfo().status).toBe('locked');
+			plugin.showEncryptionUnlock();
+			expect(readKey).not.toHaveBeenCalled();
 		});
 		it('creates and verifies storage before switching, and saves keys only to SecretStorage', async () => {
 			await plugin.configureEncryptedSync('encrypted', 'private password', true, true);
@@ -966,8 +1022,8 @@ describe('OneDriveSyncPlugin', () => {
 				new TextEncoder().encode('preserve original').buffer
 			);
 			plugin.settings.appFolderSubpath = 'plaintext';
-			const exclusive = raw.uploadExclusive.bind(raw);
-			raw.uploadExclusive = async (path: string, content: ArrayBuffer) => {
+			const exclusive = raw.uploadCreateOnly.bind(raw);
+			raw.uploadCreateOnly = async (path: string, content: ArrayBuffer) => {
 				if (path.endsWith('/vault.cryptomator')) throw new Error('simulated interruption');
 				return exclusive(path, content);
 			};
@@ -993,14 +1049,14 @@ describe('OneDriveSyncPlugin', () => {
 			(plugin as any).encryptedStorage.close();
 			(plugin as any).encryptedStorage = undefined;
 			await (plugin as any).initializeAuthenticatedComponents();
-			expect((plugin as any).remoteStorage).toBeInstanceOf(CryptomatorStorage);
+			expect(mocks.SyncEngine.mock.calls.at(-1)[1]).toBeInstanceOf(CryptomatorStorage);
 			(plugin as any).encryptedStorage.close();
 			(plugin as any).encryptedStorage = undefined;
 			secrets.clear();
 			mocks.SyncEngine.mockClear();
 			await (plugin as any).initializeAuthenticatedComponents();
 			expect(mocks.SyncEngine).not.toHaveBeenCalled();
-			expect((plugin as any).remoteStorage).toBeUndefined();
+			expect((plugin as any).syncEngine).toBeUndefined();
 			expect(plugin.getSyncStatusInfo().status).toBe('locked');
 		});
 		it('persists an explicit lock across initialization and forgets only its device key', async () => {
@@ -1050,7 +1106,7 @@ describe('OneDriveSyncPlugin', () => {
 			finishAccount({ id: '1' });
 			await pending;
 			expect((plugin as any).syncEngine).toBeUndefined();
-			expect((plugin as any).remoteStorage).toBeUndefined();
+			expect((plugin as any).syncEngine).toBeUndefined();
 			expect((plugin as any).encryptedStorage.isLocked).toBe(true);
 		});
 		it('refuses account changes and target changes without reusing a different vault key', async () => {
@@ -1059,7 +1115,7 @@ describe('OneDriveSyncPlugin', () => {
 			mocks.SyncEngine.mockClear();
 			await (plugin as any).initializeAuthenticatedComponents();
 			expect(mocks.SyncEngine).not.toHaveBeenCalled();
-			expect((plugin as any).remoteStorage).toBeUndefined();
+			expect((plugin as any).syncEngine).toBeUndefined();
 			await expect(plugin.onAppFolderSubpathChanged('plaintext')).rejects.toThrow('bound');
 		});
 	});
